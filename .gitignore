@@ -218,3 +218,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Vite
+dist-ssr
+*.local
+.DS_Store
