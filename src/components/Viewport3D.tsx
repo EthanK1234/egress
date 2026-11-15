@@ -48,7 +48,8 @@ const TOOL_COLOR: Record<Tool, string> = {
   wall: COLOR.wallTop,
   door: COLOR.door,
   exit: COLOR.exit,
-  furniture: COLOR.furnitureTop,
+  table: COLOR.furnitureTop,
+  chair: COLOR.furnitureTop,
   erase: COLOR.trapped,
 };
 

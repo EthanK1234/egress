@@ -2,7 +2,7 @@
 //
 // Kept light on the GPU on purpose:
 // - floor, paths, grid, burnt cells and bottleneck rings are one quad, shaded from tiny per-cell textures
-// - walls are one static mesh with hidden faces removed; the floors underneath are a second one
+// - walls and furniture are one static mesh with hidden faces removed; the floors underneath are a second one
 // - people and flames are instanced (one draw call each)
 // - flames and textures are uploaded once per run; the shaders animate them from the playhead
 // - the only per-frame upload is the people buffer (7 floats per person)
@@ -13,7 +13,7 @@ import { EVACUATED, FROZEN, TRAPPED, type Recording } from "../sim/recording";
 import type { Behavior, Building } from "../sim/types";
 import { viewProjection, type Camera } from "./camera";
 import { translated, type Mat4 } from "./mat4";
-import { FLOOR_SPACING, cursorPlate, flameMesh, groundMargin, groundQuads, pawnMesh, pushWalls, wallHeightAt } from "./meshes";
+import { FLOOR_SPACING, cursorPlate, flameMesh, groundMargin, groundQuads, pawnMesh, pushFurniture, pushWalls, topAt } from "./meshes";
 import { BEHAVIORS, BEHAVIOR_COLOR, COLOR, rgb, rgb255, type RGB } from "./palette";
 import { PATH_ALPHA, pathLayers } from "./paths";
 import { AGENT_VS, FLAME_VS, FLAT_FS, FLOOR_FS, FLOOR_VS, WALL_VS } from "./shaders";
@@ -200,6 +200,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
     // The shown floor's walls are built at height 0 and lifted when drawn.
     const walls: number[] = [];
     pushWalls(walls, b, 0, false);
+    pushFurniture(walls, b, 0);
     wallVertices = walls.length / WALL_FLOATS;
     gl.bindBuffer(gl.ARRAY_BUFFER, wallBuf);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(walls), gl.STATIC_DRAW);
@@ -273,7 +274,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
       cursorVertices = 0;
       return;
     }
-    const plate = cursorPlate(cell.x, cell.y, wallHeightAt(building, cell.x, cell.y), rgb(color));
+    const plate = cursorPlate(cell.x, cell.y, topAt(building, cell.x, cell.y), rgb(color));
     cursorVertices = plate.length / WALL_FLOATS;
     gl.bindBuffer(gl.ARRAY_BUFFER, cursorBuf);
     gl.bufferData(gl.ARRAY_BUFFER, plate, gl.DYNAMIC_DRAW);

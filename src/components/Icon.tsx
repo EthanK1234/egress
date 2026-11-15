@@ -68,6 +68,7 @@ const SHAPES = {
     </>
   ),
   desk: <path d="M3.5 9h17M5.5 9v9.5M18.5 9v9.5M5.5 13.5h6.5v5" />,
+  chair: <path d="M7.5 4v15.5M7.5 12.5h9v7M7.5 16.5h9" />,
   erase: (
     <>
       <path d="M9 19h10.5" />

@@ -1,5 +1,5 @@
 import { spawnAgents, updateAgent } from "./agents";
-import { EXIT, FIELD_RECOMPUTE_TICKS, MAX_TICKS, OBSTACLE, WALL } from "./config";
+import { EXIT, FIELD_RECOMPUTE_TICKS, MAX_TICKS, WALL, isFurniture } from "./config";
 import { spreadFire } from "./fire";
 import { computeField, findExits, type Exit } from "./flowfield";
 import { recordTick, recordVisit } from "./metrics";
@@ -52,7 +52,7 @@ export function createSim(building: Building, scenario: Scenario): SimState {
   }
 
   const blocked = new Uint8Array(n);
-  for (let i = 0; i < n; i++) blocked[i] = building.cells[i] === WALL || building.cells[i] === OBSTACLE || fire[i] ? 1 : 0;
+  for (let i = 0; i < n; i++) blocked[i] = building.cells[i] === WALL || isFurniture(building.cells[i]) || fire[i] ? 1 : 0;
   for (const e of exits) if (scenario.blockedExits.includes(e.id)) for (const c of e.cells) blocked[c] = 1;
 
   const agents = spawnAgents(building, scenario, rng);

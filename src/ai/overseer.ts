@@ -101,7 +101,7 @@ export function buildPrompt(building: Building, scenario: Scenario, metrics: Run
 MAP
 The floor is a grid of ${w} columns by ${h} rows. Each cell is 0.5 m. One tick is 0.5 s.
 Coordinates are (x, y): x is the column counted from 0 at the left, y is the row counted from 0 at the top.
-Legend: # wall, . open floor, D door, X furniture (desks, chairs: people must walk around it, and it cannot be moved), F fire start, a digit is an exit cell showing that exit's id (ids above 9 use letters a-z).
+Legend: # wall, . open floor, D door, T table and C chair (furniture: people must walk around it, and it cannot be moved), F fire start, a digit is an exit cell showing that exit's id (ids above 9 use letters a-z).
 
 ${toAsciiMap(building, scenario)}
 

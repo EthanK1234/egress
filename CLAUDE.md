@@ -25,7 +25,7 @@ No other libraries: no Tailwind, no state library, no test framework, no 3D libr
 - Font: Kazesawa, self-hosted Latin subset in public/fonts/.
 
 ## Sim rules
-- Grid cell = 0.5 m, tick = 0.5 s. Cells: 0 EMPTY, 1 WALL, 2 DOOR, 3 EXIT, 4 OBSTACLE (furniture: impassable to people, fire spreads over it, drawn low).
+- Grid cell = 0.5 m, tick = 0.5 s. Cells: 0 EMPTY, 1 WALL, 2 DOOR, 3 EXIT, 4 TABLE, 5 CHAIR (furniture: impassable to people, fire spreads over it).
 - Fire: each tick, spreads to each 4-neighbor non-wall cell with probability FIRE_SPREAD.
 - Movement: flow field from multi-source Dijkstra over exit cells (one global field plus one per exit). Cost = 1 + DENSITY_WEIGHT * nearby agent count. Fire and walls are impassable. Recompute every 4 ticks or when fire changes.
 - Max 1 agent per cell. Blocked agents wait (this creates door jams).

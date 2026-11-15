@@ -9,7 +9,13 @@ export const EMPTY = 0;
 export const WALL = 1;
 export const DOOR = 2;
 export const EXIT = 3;
-export const OBSTACLE = 4; // furniture: people walk around it, fire spreads over it
+// Furniture: people walk around it, fire spreads over it.
+export const TABLE = 4;
+export const CHAIR = 5;
+
+export function isFurniture(cell: number): boolean {
+  return cell === TABLE || cell === CHAIR;
+}
 
 // Fire
 export const FIRE_SPREAD = 0.06; // chance per tick to spread to each 4-neighbour non-wall cell

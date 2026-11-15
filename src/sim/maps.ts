@@ -1,7 +1,7 @@
 // The example floor plans the user can pick from (Building JSON in public/maps/),
 // and the check that turns any loaded or imported JSON into a Building.
 
-import { DOOR, EMPTY, EXIT, OBSTACLE, WALL } from "./config";
+import { CHAIR, DOOR, EMPTY, EXIT, TABLE, WALL } from "./config";
 import { findExits, type Exit } from "./flowfield";
 import type { Building } from "./types";
 
@@ -19,7 +19,7 @@ export const MAPS: MapInfo[] = [
 
 export const MAX_MAP_SIDE = 400; // cells; larger plans are too slow to simulate
 
-const ROW_CHARS: Record<string, number> = { ".": EMPTY, " ": EMPTY, "#": WALL, D: DOOR, E: EXIT, X: OBSTACLE };
+const ROW_CHARS: Record<string, number> = { ".": EMPTY, " ": EMPTY, "#": WALL, D: DOOR, E: EXIT, T: TABLE, C: CHAIR };
 const EXIT_ID = /^[0-9a-z]$/; // an exit cell in "rows" can be written as its ID instead of E
 
 interface Layout {
@@ -31,8 +31,8 @@ interface Layout {
 
 // Checks that loaded JSON is a usable Building. Throws with the reason if not.
 //
-// The layout is either `width`, `height` and `cells` (row by row, 0 empty, 1 wall, 2 door, 3 exit, 4 furniture),
-// or `rows`: one string per row using . empty, # wall, D door, E exit, X furniture. In `rows`, an exit can be
+// The layout is either `width`, `height` and `cells` (row by row, 0 empty, 1 wall, 2 door, 3 exit, 4 table, 5 chair),
+// or `rows`: one string per row using . empty, # wall, D door, E exit, T table, C chair. In `rows`, an exit can be
 // written with an ID of its own (a digit or a lowercase letter) in place of E.
 //
 // Exits are named and the entry exit is chosen by that ID, not by where the exit is:
@@ -107,7 +107,7 @@ function fromCells(data: Record<string, unknown>): Layout {
     throw new Error('the map needs a whole-number "width" and "height", or a "rows" list');
   if (!Array.isArray(cells) || cells.length !== width * height)
     throw new Error(`"cells" should hold ${width * height} values (width × height)`);
-  if (!cells.every((c) => c === EMPTY || c === WALL || c === DOOR || c === EXIT || c === OBSTACLE)) throw new Error('"cells" has a value that is not 0, 1, 2, 3 or 4');
+  if (!cells.every((c) => c === EMPTY || c === WALL || c === DOOR || c === EXIT || c === TABLE || c === CHAIR)) throw new Error('"cells" has a value that is not 0 to 5');
   return { width, height, cells: cells.slice() as number[], idCells: new Map() };
 }
 
@@ -125,7 +125,7 @@ function fromRows(rows: unknown[]): Layout {
         continue;
       }
       const cell = ROW_CHARS[ch];
-      if (cell === undefined) throw new Error(`row ${y} has the character "${ch}"; use . # D E X, or a digit or lowercase letter for an exit ID`);
+      if (cell === undefined) throw new Error(`row ${y} has the character "${ch}"; use . # D E T C, or a digit or lowercase letter for an exit ID`);
       cells.push(cell);
     }
   });
