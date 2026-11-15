@@ -1,7 +1,7 @@
 // Minimal 4x4 matrix helpers. Column-major, as WebGL expects.
 
 export type Mat4 = Float32Array;
-type Vec3 = [number, number, number];
+export type Vec3 = [number, number, number];
 
 export function perspective(fovY: number, aspect: number, near: number, far: number): Mat4 {
   const f = 1 / Math.tan(fovY / 2);
@@ -39,6 +39,13 @@ export function multiply(a: Mat4, b: Mat4): Mat4 {
   return out;
 }
 
+// m with everything it draws moved by (x, y, z).
+export function translated(m: Mat4, x: number, y: number, z: number): Mat4 {
+  const out = new Float32Array(m);
+  for (let r = 0; r < 4; r++) out[12 + r] = m[r] * x + m[4 + r] * y + m[8 + r] * z + m[12 + r];
+  return out;
+}
+
 // Transforms a point. Returns clip-space [x, y, z, w]; divide x and y by w for -1..1 screen coordinates.
 export function project(m: Mat4, x: number, y: number, z: number): [number, number, number, number] {
   return [
@@ -49,7 +56,7 @@ export function project(m: Mat4, x: number, y: number, z: number): [number, numb
   ];
 }
 
-function cross(a: Vec3, b: Vec3): Vec3 {
+export function cross(a: Vec3, b: Vec3): Vec3 {
   return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
@@ -57,7 +64,7 @@ function dot(a: Vec3, b: Vec3): number {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
-function normalize(v: Vec3): Vec3 {
+export function normalize(v: Vec3): Vec3 {
   const len = Math.hypot(v[0], v[1], v[2]) || 1;
   return [v[0] / len, v[1] / len, v[2] / len];
 }

@@ -25,7 +25,9 @@ export const COLOR = {
   wall: "#8a95a6", // 2D map
   wallTop: "#a7b2c2", // 3D view
   wallSide: "#5d6a7e",
-  exit: "#0ca30c",
+  storey: "#2b333f", // walls of the floors under the one being shown
+  slab: "#0f141a", // ground level inside the building, when the floor shown is above it
+  exit: "#12a150",
   fire: "#d03b3b",
   fireTip: "#f39a3d",
   ember: "#7a1f14", // floor under the flames, and fire that has burned for a while

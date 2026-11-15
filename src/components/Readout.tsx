@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { COLOR } from "../render/palette";
-import { CELL_M, TICK_S } from "../sim/config";
+import { CELL_M } from "../sim/config";
 import { findExits } from "../sim/flowfield";
 import type { Recording } from "../sim/recording";
 import type { Building } from "../sim/types";
@@ -14,48 +14,46 @@ interface Props {
 }
 
 // The row of numbers above the 3D view.
-// Before a run it describes the scenario; during a run it shows the state at the playhead.
+// During a run it leads with the two that matter most, how many people survived and the
+// survival rate, set apart in their own wells. Before a run it describes the scenario.
 export default function Readout({ building, recording, playhead, agentCount, fireCount }: Props) {
   if (!recording) {
     return (
       <div className="readout card">
-        <div className="tiles">
-          <Tile label="Floor" value={`${building.width * CELL_M} × ${building.height * CELL_M} m`} />
-          <Tile label="Exits" value={findExits(building).length} mark={<Dot color={COLOR.exit} />} />
-          <Tile label="People" value={agentCount} />
-          <Tile label="Fire starts" value={fireCount} mark={<Dot color={COLOR.fire} />} />
-        </div>
+        <Stat label="People" value={agentCount} />
+        <Stat label="Fire starts" value={fireCount} mark={<i className="dot square" style={{ background: COLOR.fire }} />} />
+        <Stat label="Exits" value={findExits(building).length} mark={<i className="dot square" style={{ background: COLOR.exit }} />} />
+        <Stat label="Floor size" value={`${building.width * CELL_M} × ${building.height * CELL_M}`} note="m" />
       </div>
     );
   }
 
-  const frame = Math.min(Math.floor(playhead), recording.frames - 1);
+  const last = recording.frames - 1;
+  const frame = Math.min(Math.floor(playhead), last);
   const total = recording.agents.length;
-  const evacuated = recording.evacuated[frame];
+  const survived = recording.evacuated[frame];
   const trapped = recording.trapped[frame];
   const frozen = recording.frozen[frame];
-  const inside = total - evacuated - trapped;
-  const burningM2 = recording.burning[frame] * CELL_M * CELL_M;
+  const inside = total - survived - trapped;
+  const rate = total > 0 ? Math.round((survived / total) * 100) : 0;
+  const live = playhead < last; // the run is still going, so these are running totals
   const parts = [
-    { name: "evacuated", count: evacuated, color: COLOR.exit },
-    { name: "still inside", count: inside, color: COLOR.inside },
-    { name: "trapped", count: trapped, color: COLOR.trapped },
+    { name: "survived", count: survived, color: "var(--accent)" },
+    { name: "still inside", count: inside, color: "var(--text-3)" },
+    { name: "trapped", count: trapped, color: "var(--text)" },
   ];
 
   return (
     <div className="readout card">
-      <div className="tiles">
-        <Tile label="Time" value={`${(playhead * TICK_S).toFixed(1)} s`} />
-        <Tile
-          label="Evacuated"
-          value={evacuated}
-          note={`${Math.round((evacuated / Math.max(total, 1)) * 100)}%`}
-          mark={<Dot color={COLOR.exit} />}
-        />
-        <Tile label="Still inside" value={inside} note={frozen > 0 ? `${frozen} frozen` : undefined} mark={<Dot color={COLOR.inside} />} />
-        <Tile label="Trapped" value={trapped} mark={<Dot color={COLOR.trapped} />} />
-        <Tile label="Burning" value={`${Math.round(burningM2)} m²`} mark={<Dot color={COLOR.fire} />} />
-      </div>
+      <Stat hero label="Survived" value={survived} note={`of ${total}${live ? " so far" : ""}`} />
+      <Stat hero label="Survival rate" value={`${rate}%`} note={live ? "so far" : undefined} />
+      <Stat
+        label="Still inside"
+        value={inside}
+        note={frozen > 0 ? `${frozen} frozen` : undefined}
+        mark={<i className="dot" style={{ background: "var(--text-3)" }} />}
+      />
+      <Stat label="Trapped" value={trapped} mark={<i className="dot" style={{ background: "var(--text)" }} />} />
       <div className="split" role="img" aria-label={parts.map((part) => `${part.count} ${part.name}`).join(", ")}>
         {parts.map((part) => part.count > 0 && <i key={part.name} style={{ flexGrow: part.count, background: part.color }} />)}
       </div>
@@ -63,21 +61,17 @@ export default function Readout({ building, recording, playhead, agentCount, fir
   );
 }
 
-function Tile({ label, value, note, mark }: { label: string; value: string | number; note?: string; mark?: ReactNode }) {
+function Stat(p: { label: string; value: string | number; note?: string; mark?: ReactNode; hero?: boolean }) {
   return (
-    <div className="tile">
-      <div className="tile-label">
-        {mark}
-        {label}
+    <div className={p.hero ? "stat hero" : "stat"}>
+      <div className="caps stat-label">
+        {p.mark}
+        {p.label}
       </div>
-      <div className="tile-value">
-        {value}
-        {note && <span className="tile-note">{note}</span>}
+      <div className="stat-value num">
+        {p.value}
+        {p.note && <small>{p.note}</small>}
       </div>
     </div>
   );
-}
-
-function Dot({ color }: { color: string }) {
-  return <i className="dot" style={{ background: color }} />;
 }

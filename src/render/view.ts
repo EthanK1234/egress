@@ -6,8 +6,9 @@ export interface Layers {
   people: Record<Behavior, boolean>; // show agents with this behavior
   paths: Record<Behavior, boolean>; // highlight the cells this behavior walked through
   grid: boolean;
-  labels: boolean;
-  bottlenecks: boolean;
+  labels: boolean; // room and exit names
+  bottlenecks: boolean; // rings on the jam spots once results are shown
+  selected: number | null; // id of the person picked out: ringed on the map, followed in the 3D view
 }
 
 export const DEFAULT_LAYERS: Layers = {
@@ -16,6 +17,7 @@ export const DEFAULT_LAYERS: Layers = {
   grid: true,
   labels: true,
   bottlenecks: true,
+  selected: null,
 };
 
 export const RING_RADIUS = 2; // bottleneck marker radius, in cells

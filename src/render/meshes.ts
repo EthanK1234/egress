@@ -5,8 +5,9 @@ import { EXIT, WALL } from "../sim/config";
 import type { Building } from "../sim/types";
 import { COLOR, rgb, type RGB } from "./palette";
 
-export const WALL_HEIGHT = 2.6;
-const EXIT_POST_HEIGHT = 3.3; // the wall cells either side of an exit stand a little taller
+export const WALL_HEIGHT = 3.4;
+export const EXIT_POST_HEIGHT = 4.1; // the wall cells either side of an exit stand a little taller
+export const FLOOR_SPACING = 4; // height from one floor to the next
 export const PAWN_HEIGHT = 2.2;
 export const PAWN_RADIUS = 0.43; // at the feet
 
@@ -94,47 +95,63 @@ export function flameMesh(): Float32Array {
   return new Float32Array(out);
 }
 
-// All walls as one mesh. Faces between two wall cells are never seen, so they are left out.
+// Height of the wall drawn on a cell: 0 where there is no wall.
+export function wallHeightAt(b: Building, x: number, y: number): number {
+  const cellAt = (cx: number, cy: number) => (cx < 0 || cy < 0 || cx >= b.width || cy >= b.height ? -1 : b.cells[cy * b.width + cx]);
+  if (cellAt(x, y) !== WALL) return 0;
+  const byExit = cellAt(x - 1, y) === EXIT || cellAt(x + 1, y) === EXIT || cellAt(x, y - 1) === EXIT || cellAt(x, y + 1) === EXIT;
+  return byExit ? EXIT_POST_HEIGHT : WALL_HEIGHT;
+}
+
+// Appends all walls of one floor. Faces between two wall cells are never seen, so they are left out.
+// `base` is the height the floor stands at. A floor under the one being shown is drawn as a storey:
+// plain dark walls that reach up to the floor above, so the stack reads as one building.
 // Layout: position (3), normal (3), color (3).
-export function wallMesh(b: Building): Float32Array {
-  const { width: w, height: h, cells } = b;
-  const out: number[] = [];
-  const top = rgb(COLOR.wallTop);
-  const side = rgb(COLOR.wallSide);
+export function pushWalls(out: number[], b: Building, base: number, asStorey: boolean): void {
+  const { width: w, height: h } = b;
+  const top = rgb(asStorey ? COLOR.storey : COLOR.wallTop);
+  const side = rgb(asStorey ? COLOR.storey : COLOR.wallSide);
   const postTop = rgb(COLOR.exit);
   const postSide = postTop.map((c) => c * 0.6) as RGB;
-
-  const cellAt = (x: number, y: number) => (x < 0 || y < 0 || x >= w || y >= h ? -1 : cells[y * w + x]);
+  // A storey stops just short of the floor above, so the two never share a surface.
   const heightAt = (x: number, y: number) => {
-    if (cellAt(x, y) !== WALL) return 0;
-    const byExit =
-      cellAt(x - 1, y) === EXIT || cellAt(x + 1, y) === EXIT || cellAt(x, y - 1) === EXIT || cellAt(x, y + 1) === EXIT;
-    return byExit ? EXIT_POST_HEIGHT : WALL_HEIGHT;
+    const height = wallHeightAt(b, x, y);
+    return asStorey && height > 0 ? FLOOR_SPACING - 0.05 : height;
   };
 
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const height = heightAt(x, y);
       if (height === 0) continue;
-      const isPost = height > WALL_HEIGHT;
-      const inside: V3 = [x + 0.5, height / 2, y + 0.5];
-      pushQuad(out, [x, height, y], [x + 1, height, y], [x + 1, height, y + 1], [x, height, y + 1], inside, isPost ? postTop : top);
+      const isPost = !asStorey && height > WALL_HEIGHT;
+      const y1 = base + height;
+      const inside: V3 = [x + 0.5, base + height / 2, y + 0.5];
+      pushQuad(out, [x, y1, y], [x + 1, y1, y], [x + 1, y1, y + 1], [x, y1, y + 1], inside, isPost ? postTop : top);
 
       // Each side shows only the part that rises above its neighbour.
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         const low = heightAt(x + dx, y + dy);
         if (low >= height) continue;
+        const y0 = base + low;
         const color = isPost ? postSide : side;
         if (dx !== 0) {
           const fx = dx > 0 ? x + 1 : x;
-          pushQuad(out, [fx, low, y], [fx, low, y + 1], [fx, height, y + 1], [fx, height, y], inside, color);
+          pushQuad(out, [fx, y0, y], [fx, y0, y + 1], [fx, y1, y + 1], [fx, y1, y], inside, color);
         } else {
           const fz = dy > 0 ? y + 1 : y;
-          pushQuad(out, [x, low, fz], [x + 1, low, fz], [x + 1, height, fz], [x, height, fz], inside, color);
+          pushQuad(out, [x, y0, fz], [x + 1, y0, fz], [x + 1, y1, fz], [x, y1, fz], inside, color);
         }
       }
     }
   }
+}
+
+// A flat square just above a cell (or above the wall on it): the cursor of the layout editor.
+// Layout: position (3), normal (3), color (3).
+export function cursorPlate(x: number, y: number, height: number, color: RGB): Float32Array {
+  const out: number[] = [];
+  const top = height + 0.06;
+  pushQuad(out, [x, top, y], [x + 1, top, y], [x + 1, top, y + 1], [x, top, y + 1], [x + 0.5, top - 1, y + 0.5], color);
   return new Float32Array(out);
 }
 
@@ -143,9 +160,10 @@ export function groundMargin(b: Building): number {
   return Math.max(b.width, b.height) * 0.8;
 }
 
-// The ground: one quad under and around the building, facing up. Layout: x, z.
-export function groundQuad(b: Building): Float32Array {
+// Two quads facing up: the ground under and around the building, then only the footprint of the
+// building (used for a floor that is drawn above ground level). Layout: x, z.
+export function groundQuads(b: Building): Float32Array {
   const m = groundMargin(b);
-  const x0 = -m, z0 = -m, x1 = b.width + m, z1 = b.height + m;
-  return new Float32Array([x0, z0, x0, z1, x1, z1, x0, z0, x1, z1, x1, z0]);
+  const quad = (x0: number, z0: number, x1: number, z1: number) => [x0, z0, x0, z1, x1, z1, x0, z0, x1, z1, x1, z0];
+  return new Float32Array([...quad(-m, -m, b.width + m, b.height + m), ...quad(0, 0, b.width, b.height)]);
 }

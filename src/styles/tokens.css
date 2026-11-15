@@ -1,0 +1,67 @@
+/* The skin. Everything visual that makes this look "neumorphic" is a token here:
+   one soft surface, a light and a dark shadow lit from the top left, generous radii.
+   To try another look (for example a bento grid), swap these values and the layout
+   in layout.css; the components only refer to the tokens. */
+
+@font-face {
+  font-family: "Figtree";
+  src: url("/fonts/Figtree.woff2") format("woff2");
+  font-weight: 300 900;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light;
+
+  /* Surface: a cool, very light gray. Cards are the same color as the page;
+     only their shadows lift them off it. */
+  --bg: #e6eaf0;
+  --surface: var(--bg);
+  --surface-2: #dde3ea;
+  --shade: rgba(163, 177, 198, 0.62);
+  --glow: rgba(255, 255, 255, 0.95);
+
+  /* Ink. Soft UI is low contrast by nature, so the text is not: 13:1, 6:1 and 4.8:1. */
+  --text: #1b2430;
+  --text-2: #4a5666;
+  --text-3: #5a6675;
+  --line: rgba(27, 36, 48, 0.08);
+  --line-2: rgba(27, 36, 48, 0.16);
+
+  /* One accent: exit-sign green. White text on it is 4.7:1. */
+  --accent: #0a8540;
+  --accent-ink: #ffffff;
+  --danger: #b82a2a;
+
+  /* The 3D view and the floor plan are dark "screens" set into the soft surface. */
+  --screen: #0b0e12;
+  --screen-text: #edf1f5;
+  --screen-text-2: #b6c0cc;
+  --screen-line: rgba(255, 255, 255, 0.14);
+
+  /* Depth. Blur is about twice the offset; pressed is the same pair turned inward. */
+  --raised: 8px 8px 18px var(--shade), -8px -8px 18px var(--glow);
+  --raised-sm: 4px 4px 9px var(--shade), -4px -4px 9px var(--glow);
+  --pressed: inset 4px 4px 9px var(--shade), inset -4px -4px 9px var(--glow);
+  --pressed-sm: inset 2px 2px 5px var(--shade), inset -2px -2px 5px var(--glow);
+  /* A dark screen can't show an inner shadow, so its rim is lit the other way round. */
+  --sunk: -3px -3px 7px var(--shade), 3px 3px 7px var(--glow);
+
+  /* Shape. Inner radius = outer radius minus the padding between them. */
+  --radius: 24px;
+  --radius-inner: 14px;
+  --radius-control: 12px;
+
+  /* Space: 4, 8, 12, 16, 24, 32. Cards sit 24px apart so their shadows have room. */
+  --gap: 24px;
+
+  /* Type: one family, six sizes. */
+  --font: "Figtree", "Segoe UI", system-ui, sans-serif;
+  --fs-caps: 12px;
+  --fs-small: 13px;
+  --fs-ui: 14px;
+  --fs-body: 15px;
+  --fs-title: 17px;
+  --fs-stat: 24px;
+  --fs-hero: 40px;
+}

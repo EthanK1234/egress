@@ -16,10 +16,13 @@ No other libraries: no Tailwind, no state library, no test framework, no 3D libr
 - A run is computed up front into a Recording (src/sim/recording.ts): every agent's position and status per tick, when each cell caught fire, and which cells each behavior walked on. Computing is sliced across animation frames so the page stays responsive.
 - Playback only reads the Recording. The playhead is a fractional frame; play/pause, seek and speed never touch the sim.
 - The 3D view (main) and the 2D floor map (side) both draw from (recording, playhead, layers), so they always agree. Fire starts are placed on the 2D map.
-- Layers: show/hide people per behavior, path highlights per behavior, grid, names, bottleneck rings.
+- Layers: show/hide people per behavior, path highlights per behavior, grid. One person can be selected (People tab) and followed in first person.
+- Layout editor (before a run): tools on the 3D view paint walls, doors, exits and fire; the cursor's cell is shown as coordinates. A layout is a stack of floors (src/editor/layout.ts). Floors are simulated one at a time; an exit on an upper floor stands for a stairwell door.
+- The numbers above the 3D view lead with Survived and Survival rate. Time is deliberately the least prominent.
 - Results appear once playback reaches the end of the run.
 - The 3D view draws only when something changed. Flames and paths are uploaded once per run and animated in the shaders from the playhead; walls are one static mesh; people and flames are instanced.
-- Font: Kazesawa, self-hosted Latin subset in public/fonts/.
+- Look: neumorphic (soft light surface, dark inset "screens" for the 3D view and floor plan). All of it is tokens in src/styles/tokens.css; src/index.css only imports src/styles/ and holds feature CSS appended below.
+- Font: Figtree, self-hosted Latin subset in public/fonts/.
 
 ## Sim rules
 - Grid cell = 0.5 m, tick = 0.5 s. Cells: 0 EMPTY, 1 WALL, 2 DOOR, 3 EXIT.
@@ -47,9 +50,11 @@ interface OverseerProposal { diagnosis: string; edits: BuildingEdit[]; expectedI
 ## Folders
 - src/sim/: pure TypeScript, no React or DOM imports (types, config, rng, fire, flowfield, agents, sim, metrics, recording, edits, maps, testMap)
 - src/render/: drawing code shared by both views, no React (palette, view, paths, mat4, camera, meshes, shaders, renderer)
+- src/editor/: layout editing, no React (layout)
+- src/styles/: the design system (tokens, base, layout, panels)
 - src/ai/: Gemini calls (gemini.ts client, floorplan.ts, overseer.ts)
-- src/components/: React UI (Viewport3D, MapCanvas, Transport, Readout, LayerPanel, ScenarioPanel, ResultsPanel, OverseerPanel, Switch, usePlayback)
-- public/fonts/: Kazesawa font files and licence
+- src/components/: React UI (Viewport3D, MapCanvas, Transport, Readout, LayerPanel, PeoplePanel, ScenarioPanel, ResultsPanel, OverseerPanel, ToolBar, FloorPicker, Steps, Segmented, Switch, Icon, usePlayback)
+- public/fonts/: Figtree font file and licence
 - public/maps/: example floor plans as Building JSON (two-rooms, office, venue), listed in src/sim/maps.ts
 - public/cache/: saved Gemini responses for offline demo
 
