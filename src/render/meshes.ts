@@ -1,11 +1,12 @@
 // Low-poly geometry for the 3D view, built in code. Units are grid cells; y is up.
 // Every triangle is flat-shaded: its three vertices share one normal.
 
-import { EXIT, WALL } from "../sim/config";
+import { EXIT, OBSTACLE, WALL } from "../sim/config";
 import type { Building } from "../sim/types";
 import { COLOR, rgb, type RGB } from "./palette";
 
 export const WALL_HEIGHT = 3.4;
+export const FURNITURE_HEIGHT = 1.5; // desk height: people can be seen over it
 export const EXIT_POST_HEIGHT = 4.1; // the wall cells either side of an exit stand a little taller
 export const FLOOR_SPACING = 4; // height from one floor to the next
 export const PAWN_HEIGHT = 2.2;
@@ -95,15 +96,16 @@ export function flameMesh(): Float32Array {
   return new Float32Array(out);
 }
 
-// Height of the wall drawn on a cell: 0 where there is no wall.
+// Height of the wall or furniture drawn on a cell: 0 where there is neither.
 export function wallHeightAt(b: Building, x: number, y: number): number {
   const cellAt = (cx: number, cy: number) => (cx < 0 || cy < 0 || cx >= b.width || cy >= b.height ? -1 : b.cells[cy * b.width + cx]);
+  if (cellAt(x, y) === OBSTACLE) return FURNITURE_HEIGHT;
   if (cellAt(x, y) !== WALL) return 0;
   const byExit = cellAt(x - 1, y) === EXIT || cellAt(x + 1, y) === EXIT || cellAt(x, y - 1) === EXIT || cellAt(x, y + 1) === EXIT;
   return byExit ? EXIT_POST_HEIGHT : WALL_HEIGHT;
 }
 
-// Appends all walls of one floor. Faces between two wall cells are never seen, so they are left out.
+// Appends all walls and furniture of one floor. Faces between two wall cells are never seen, so they are left out.
 // `base` is the height the floor stands at. A floor under the one being shown is drawn as a storey:
 // plain dark walls that reach up to the floor above, so the stack reads as one building.
 // Layout: position (3), normal (3), color (3).
@@ -113,10 +115,13 @@ export function pushWalls(out: number[], b: Building, base: number, asStorey: bo
   const side = rgb(asStorey ? COLOR.storey : COLOR.wallSide);
   const postTop = rgb(COLOR.exit);
   const postSide = postTop.map((c) => c * 0.6) as RGB;
-  // A storey stops just short of the floor above, so the two never share a surface.
+  const deskTop = rgb(COLOR.furnitureTop);
+  const deskSide = rgb(COLOR.furnitureSide);
+  // A storey stops just short of the floor above, so the two never share a surface. It has no furniture.
   const heightAt = (x: number, y: number) => {
     const height = wallHeightAt(b, x, y);
-    return asStorey && height > 0 ? FLOOR_SPACING - 0.05 : height;
+    if (!asStorey) return height;
+    return height > FURNITURE_HEIGHT ? FLOOR_SPACING - 0.05 : 0;
   };
 
   for (let y = 0; y < h; y++) {
@@ -124,16 +129,17 @@ export function pushWalls(out: number[], b: Building, base: number, asStorey: bo
       const height = heightAt(x, y);
       if (height === 0) continue;
       const isPost = !asStorey && height > WALL_HEIGHT;
+      const isDesk = height === FURNITURE_HEIGHT;
       const y1 = base + height;
       const inside: V3 = [x + 0.5, base + height / 2, y + 0.5];
-      pushQuad(out, [x, y1, y], [x + 1, y1, y], [x + 1, y1, y + 1], [x, y1, y + 1], inside, isPost ? postTop : top);
+      pushQuad(out, [x, y1, y], [x + 1, y1, y], [x + 1, y1, y + 1], [x, y1, y + 1], inside, isPost ? postTop : isDesk ? deskTop : top);
 
       // Each side shows only the part that rises above its neighbour.
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         const low = heightAt(x + dx, y + dy);
         if (low >= height) continue;
         const y0 = base + low;
-        const color = isPost ? postSide : side;
+        const color = isPost ? postSide : isDesk ? deskSide : side;
         if (dx !== 0) {
           const fx = dx > 0 ? x + 1 : x;
           pushQuad(out, [fx, y0, y], [fx, y0, y + 1], [fx, y1, y + 1], [fx, y1, y], inside, color);

@@ -6,6 +6,7 @@ const TOOLS: { id: Tool; label: string; icon: IconName; hint: string }[] = [
   { id: "wall", label: "Wall", icon: "wall", hint: "Drag to build walls" },
   { id: "door", label: "Door", icon: "door", hint: "Drag to place doors" },
   { id: "exit", label: "Exit", icon: "exit", hint: "Drag to place exits. On an upper floor, an exit is a stairwell door" },
+  { id: "furniture", label: "Furniture", icon: "desk", hint: "Drag to place desks and chairs. People walk around them; fire spreads over them" },
   { id: "erase", label: "Erase", icon: "erase", hint: "Drag to clear cells back to open floor" },
 ];
 

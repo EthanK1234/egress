@@ -1,5 +1,5 @@
 import { spawnAgents, updateAgent } from "./agents";
-import { EXIT, FIELD_RECOMPUTE_TICKS, MAX_TICKS, WALL } from "./config";
+import { EXIT, FIELD_RECOMPUTE_TICKS, MAX_TICKS, OBSTACLE, WALL } from "./config";
 import { spreadFire } from "./fire";
 import { computeField, findExits, type Exit } from "./flowfield";
 import { recordTick, recordVisit } from "./metrics";
@@ -18,7 +18,7 @@ export interface SimState {
   agents: Agent[];
   exits: Exit[];
   fire: Uint8Array; // 1 = burning
-  blocked: Uint8Array; // 1 = impassable (wall, blocked exit, fire)
+  blocked: Uint8Array; // 1 = impassable (wall, furniture, blocked exit, fire)
   occ: Int32Array; // agent id + 1, or 0
   density: Float32Array; // agents in the 3x3 block around each cell
   globalField: Float32Array;
@@ -52,7 +52,7 @@ export function createSim(building: Building, scenario: Scenario): SimState {
   }
 
   const blocked = new Uint8Array(n);
-  for (let i = 0; i < n; i++) blocked[i] = building.cells[i] === WALL || fire[i] ? 1 : 0;
+  for (let i = 0; i < n; i++) blocked[i] = building.cells[i] === WALL || building.cells[i] === OBSTACLE || fire[i] ? 1 : 0;
   for (const e of exits) if (scenario.blockedExits.includes(e.id)) for (const c of e.cells) blocked[c] = 1;
 
   const agents = spawnAgents(building, scenario, rng);

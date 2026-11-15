@@ -4,7 +4,7 @@
 // per-cell visits look like scattered dots. Each visit is spread over the 3x3 block around it
 // instead, which turns a route into a continuous band.
 
-import { WALL } from "../sim/config";
+import { OBSTACLE, WALL } from "../sim/config";
 import type { Recording } from "../sim/recording";
 import type { Behavior } from "../sim/types";
 import { BEHAVIORS } from "./palette";
@@ -38,7 +38,7 @@ function buildLayer(rec: Recording, behavior: Behavior): PathLayer {
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = y * w + x;
-      if (cells[i] === WALL) continue;
+      if (cells[i] === WALL || cells[i] === OBSTACLE) continue;
       let passes = 0;
       for (let ny = Math.max(0, y - 1); ny <= Math.min(h - 1, y + 1); ny++) {
         for (let nx = Math.max(0, x - 1); nx <= Math.min(w - 1, x + 1); nx++) {

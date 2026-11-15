@@ -1,4 +1,4 @@
-import { BOTTLENECK_SPACING, CELL_M, CONGESTION_DENSITY, MAX_BOTTLENECKS, TICK_S, WALL } from "./config";
+import { BOTTLENECK_SPACING, CELL_M, CONGESTION_DENSITY, MAX_BOTTLENECKS, OBSTACLE, TICK_S, WALL } from "./config";
 import type { SimState } from "./sim";
 import type { Agent, RunMetrics } from "./types";
 
@@ -17,7 +17,7 @@ export function recordTick(s: SimState): void {
   const { cells } = s.building;
   for (let i = 0; i < cells.length; i++) {
     if (s.occ[i]) s.heatmap[i]++;
-    if (cells[i] === WALL) continue;
+    if (cells[i] === WALL || cells[i] === OBSTACLE) continue;
     const perM2 = s.density[i] / BLOCK_AREA_M2;
     if (perM2 > s.peakDensity[i]) s.peakDensity[i] = perM2;
     if (perM2 >= CONGESTION_DENSITY) s.ticksCongested[i]++;

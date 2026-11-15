@@ -17,7 +17,7 @@ interface Props {
   onCellClick?: (x: number, y: number) => void; // set while fire starts can be edited
 }
 
-const CELL_RGB = [COLOR.floor, COLOR.wall, COLOR.door, COLOR.exit].map(rgb255); // indexed by cell value
+const CELL_RGB = [COLOR.floor, COLOR.wall, COLOR.door, COLOR.exit, COLOR.furniture].map(rgb255); // indexed by cell value
 const PATH_RGB = BEHAVIORS.map((b) => rgb255(BEHAVIOR_COLOR[b]));
 const FIRE_RGB = rgb255(COLOR.fire);
 const FIRE_FRONT_RGB = rgb255(COLOR.fireTip);

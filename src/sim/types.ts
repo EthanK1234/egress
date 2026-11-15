@@ -1,4 +1,4 @@
-export type Cell = 0 | 1 | 2 | 3;
+export type Cell = 0 | 1 | 2 | 3 | 4;
 
 export interface Building {
   width: number;
@@ -6,6 +6,8 @@ export interface Building {
   cells: number[];
   labels: { name: string; x: number; y: number }[];
   entryExitId: number;
+  // Names given to exits. Each is tied to one cell of its exit, so it survives exits being renumbered.
+  exitNames?: { name: string; x: number; y: number }[];
 }
 
 export interface Agent {

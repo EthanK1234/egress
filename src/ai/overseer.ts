@@ -2,6 +2,7 @@
 
 import { DOOR } from "../sim/config";
 import { getExits, toAsciiMap } from "../sim/edits";
+import { exitName } from "../sim/flowfield";
 import type { Building, BuildingEdit, OverseerProposal, RunMetrics, Scenario } from "../sim/types";
 import { generateJson } from "./gemini";
 
@@ -77,7 +78,9 @@ export function buildPrompt(building: Building, scenario: Scenario, metrics: Run
       scenario.blockedExits.includes(e.id) ? "BLOCKED in this scenario" : "",
     ].filter(Boolean);
     const at = `(${Math.round(e.center.x)}, ${Math.round(e.center.y)})`;
-    return `- Exit ${e.id} at ${at}, ${e.cells.length} cells wide, used by ${metrics.exitUsage[e.id] ?? 0} people${notes.length ? ` [${notes.join(", ")}]` : ""}`;
+    const name = exitName(building, e);
+    const called = name === `Exit ${e.id}` ? "" : ` ("${name}")`;
+    return `- Exit ${e.id}${called} at ${at}, ${e.cells.length} cells wide, used by ${metrics.exitUsage[e.id] ?? 0} people${notes.length ? ` [${notes.join(", ")}]` : ""}`;
   });
 
   const bottlenecks = metrics.bottlenecks.map((b, i) => {
@@ -98,7 +101,7 @@ export function buildPrompt(building: Building, scenario: Scenario, metrics: Run
 MAP
 The floor is a grid of ${w} columns by ${h} rows. Each cell is 0.5 m. One tick is 0.5 s.
 Coordinates are (x, y): x is the column counted from 0 at the left, y is the row counted from 0 at the top.
-Legend: # wall, . open floor, D door, F fire start, a digit is an exit cell showing that exit's id (ids above 9 use letters a-z).
+Legend: # wall, . open floor, D door, X furniture (desks, chairs: people must walk around it, and it cannot be moved), F fire start, a digit is an exit cell showing that exit's id (ids above 9 use letters a-z).
 
 ${toAsciiMap(building, scenario)}
 

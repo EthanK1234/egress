@@ -41,6 +41,12 @@ export function findExits(b: Building): Exit[] {
   return exits;
 }
 
+// What to call an exit: the name it was given, or "Exit" and its number.
+export function exitName(b: Building, exit: Exit): string {
+  const named = b.exitNames?.find((n) => exit.cells.includes(n.y * b.width + n.x));
+  return named ? named.name : `Exit ${exit.id}`;
+}
+
 // True if a move from (x, y) by (dx, dy) is allowed. Diagonals can't cut corners.
 export function canStep(w: number, h: number, blocked: Uint8Array, x: number, y: number, dx: number, dy: number): boolean {
   const nx = x + dx;

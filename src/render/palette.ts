@@ -25,6 +25,9 @@ export const COLOR = {
   wall: "#8a95a6", // 2D map
   wallTop: "#a7b2c2", // 3D view
   wallSide: "#5d6a7e",
+  furniture: "#7d6a55", // 2D map
+  furnitureTop: "#9a846b", // 3D view
+  furnitureSide: "#5f5040",
   storey: "#2b333f", // walls of the floors under the one being shown
   slab: "#0f141a", // ground level inside the building, when the floor shown is above it
   exit: "#12a150",

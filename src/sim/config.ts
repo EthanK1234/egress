@@ -9,6 +9,7 @@ export const EMPTY = 0;
 export const WALL = 1;
 export const DOOR = 2;
 export const EXIT = 3;
+export const OBSTACLE = 4; // furniture: people walk around it, fire spreads over it
 
 // Fire
 export const FIRE_SPREAD = 0.06; // chance per tick to spread to each 4-neighbour non-wall cell

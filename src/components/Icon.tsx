@@ -67,6 +67,7 @@ const SHAPES = {
       <path d="M17 8.5l3.5 3.5-3.5 3.5" />
     </>
   ),
+  desk: <path d="M3.5 9h17M5.5 9v9.5M18.5 9v9.5M5.5 13.5h6.5v5" />,
   erase: (
     <>
       <path d="M9 19h10.5" />

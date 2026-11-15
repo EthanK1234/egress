@@ -7,7 +7,7 @@ import { COLOR } from "../render/palette";
 import { createRenderer, typeScale, type Renderer } from "../render/renderer";
 import { RING_RADIUS, type Layers } from "../render/view";
 import { CELL_M } from "../sim/config";
-import { findExits } from "../sim/flowfield";
+import { exitName, findExits } from "../sim/flowfield";
 import type { Recording } from "../sim/recording";
 import type { Building } from "../sim/types";
 
@@ -48,6 +48,7 @@ const TOOL_COLOR: Record<Tool, string> = {
   wall: COLOR.wallTop,
   door: COLOR.door,
   exit: COLOR.exit,
+  furniture: COLOR.furnitureTop,
   erase: COLOR.trapped,
 };
 
@@ -61,7 +62,7 @@ function buildLabels(b: Building, showNames: boolean, rings: Props["rings"], sho
       labels.push({
         key: `exit${exit.id}`,
         kind: "exit",
-        text: exit.id === b.entryExitId ? `Exit ${exit.id} · entry` : `Exit ${exit.id}`,
+        text: exit.id === b.entryExitId ? `${exitName(b, exit)} · entry` : exitName(b, exit),
         x: (Math.min(...xs) + Math.max(...xs) + 1) / 2,
         y: EXIT_POST_HEIGHT + 0.8,
         z: (Math.min(...ys) + Math.max(...ys) + 1) / 2,

@@ -4,11 +4,11 @@
 // Floors are simulated one at a time (the sim knows nothing about stairs). An exit on an
 // upper floor stands for a stairwell door: people who reach it count as having left that floor.
 
-import { DOOR, EMPTY, EXIT, WALL } from "../sim/config";
+import { DOOR, EMPTY, EXIT, OBSTACLE, WALL } from "../sim/config";
 import { findExits } from "../sim/flowfield";
 import type { Building } from "../sim/types";
 
-export type Tool = "fire" | "wall" | "door" | "exit" | "erase";
+export type Tool = "fire" | "wall" | "door" | "exit" | "furniture" | "erase";
 
 export interface Floor {
   building: Building;
@@ -17,7 +17,7 @@ export interface Floor {
 
 export const MAX_FLOORS = 6;
 
-const TOOL_CELL: Record<Exclude<Tool, "fire">, number> = { wall: WALL, door: DOOR, exit: EXIT, erase: EMPTY };
+const TOOL_CELL: Record<Exclude<Tool, "fire">, number> = { wall: WALL, door: DOOR, exit: EXIT, furniture: OBSTACLE, erase: EMPTY };
 
 // Sets one cell to what the tool paints. Returns the same floor if nothing would change.
 export function paintCell(floor: Floor, x: number, y: number, tool: Exclude<Tool, "fire">): Floor {

@@ -1,6 +1,6 @@
 // Layout edits proposed by the overseer, plus the text views of a building it reads.
 
-import { DOOR, EXIT, WALL } from "./config";
+import { DOOR, EXIT, OBSTACLE, WALL } from "./config";
 import { findExits } from "./flowfield";
 import type { Building, BuildingEdit, Scenario } from "./types";
 
@@ -35,12 +35,12 @@ export function getExits(b: Building): ExitInfo[] {
   });
 }
 
-// One character per cell, one line per row: # wall, . empty, D door, F fire start,
+// One character per cell, one line per row: # wall, . empty, D door, X furniture, F fire start,
 // and the exit id for exit cells (0-9, then a-z for ids 10 and up).
 export function toAsciiMap(b: Building, scenario: Scenario): string {
   const { width: w, height: h, cells } = b;
   const chars: string[] = new Array(w * h);
-  for (let i = 0; i < chars.length; i++) chars[i] = cells[i] === WALL ? "#" : cells[i] === DOOR ? "D" : ".";
+  for (let i = 0; i < chars.length; i++) chars[i] = cells[i] === WALL ? "#" : cells[i] === DOOR ? "D" : cells[i] === OBSTACLE ? "X" : ".";
   for (const e of findExits(b)) for (const c of e.cells) chars[c] = e.id.toString(36).slice(-1);
   for (const [x, y] of scenario.fireStarts) if (x >= 0 && y >= 0 && x < w && y < h) chars[y * w + x] = "F";
   const rows: string[] = [];
@@ -205,7 +205,7 @@ function canBeExit(b: Building, i: number): boolean {
   const onY = y === 0 || y === h - 1;
   if (onX === onY) return false; // interior or corner
   const inward = onY ? (y === 0 ? i + w : i - w) : x === 0 ? i + 1 : i - 1;
-  return cells[inward] !== WALL;
+  return cells[inward] !== WALL && cells[inward] !== OBSTACLE;
 }
 
 function isCoord(x: number, y: number): boolean {

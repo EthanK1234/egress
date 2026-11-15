@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { CELL_M, CONGESTION_DENSITY, DOOR, TICK_S } from "../sim/config";
-import { findExits, type Exit } from "../sim/flowfield";
+import { exitName, findExits, type Exit } from "../sim/flowfield";
 import type { Recording } from "../sim/recording";
 import type { Building } from "../sim/types";
 
@@ -16,7 +16,7 @@ const NEAR_DOOR_M = 3;
 export default function ResultsPanel({ recording }: Props) {
   const { building, metrics } = recording;
   const exits = useMemo(() => findExits(building), [building]);
-  const usage = exits.map((e) => ({ id: e.id, count: metrics.exitUsage[e.id] ?? 0 })).sort((a, b) => b.count - a.count);
+  const usage = exits.map((e) => ({ id: e.id, name: exitName(building, e), count: metrics.exitUsage[e.id] ?? 0 })).sort((a, b) => b.count - a.count);
   const busiest = Math.max(1, ...usage.map((u) => u.count));
 
   return (
@@ -27,10 +27,10 @@ export default function ResultsPanel({ recording }: Props) {
           <div
             key={u.id}
             className="bar-row"
-            title={`Exit ${u.id}: ${u.count} people, ${Math.round((u.count / Math.max(metrics.evacuated, 1)) * 100)}% of those who survived`}
+            title={`${u.name}: ${u.count} people, ${Math.round((u.count / Math.max(metrics.evacuated, 1)) * 100)}% of those who survived`}
           >
             <span className="bar-name">
-              Exit {u.id}
+              {u.name}
               {u.id === building.entryExitId && <span className="bar-tag">entry</span>}
             </span>
             <span className="bar-track">
@@ -66,16 +66,19 @@ function describeSpot(b: Building, exits: Exit[], x: number, y: number): string 
   const metres = (cell: number) => Math.hypot((cell % b.width) - x, Math.floor(cell / b.width) - y) * CELL_M;
 
   let exitDist = Infinity;
-  let exitId = -1;
+  let nearest: Exit | null = null;
   for (const e of exits) {
     for (const cell of e.cells) {
       if (metres(cell) < exitDist) {
         exitDist = metres(cell);
-        exitId = e.id;
+        nearest = e;
       }
     }
   }
-  if (exitDist <= NEAR_EXIT_M) return `Near exit ${exitId}`;
+  if (nearest && exitDist <= NEAR_EXIT_M) {
+    const name = exitName(b, nearest);
+    return name === `Exit ${nearest.id}` ? `Near exit ${nearest.id}` : `Near ${name}`;
+  }
 
   let doorDist = Infinity;
   for (let i = 0; i < b.cells.length; i++) if (b.cells[i] === DOOR) doorDist = Math.min(doorDist, metres(i));
