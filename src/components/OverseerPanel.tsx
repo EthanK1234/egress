@@ -1,6 +1,8 @@
 import { COLOR } from "../render/palette";
+import { TICK_S } from "../sim/config";
 import type { EditResult } from "../sim/edits";
-import type { BuildingEdit, OverseerProposal, RunMetrics } from "../sim/types";
+import type { Recording } from "../sim/recording";
+import type { BuildingEdit, OverseerProposal } from "../sim/types";
 import Switch from "./Switch";
 
 interface Props {
@@ -9,8 +11,8 @@ interface Props {
   busy: boolean; // waiting for the overseer
   error: string | null;
   replay: boolean;
-  before: RunMetrics | null; // set once the edits have been applied and re-run
-  after: RunMetrics; // the run being shown
+  before: Recording | null; // the original run, set once the edits have been applied and re-run
+  after: Recording; // the run being shown
   onReplay: (on: boolean) => void;
   onAsk: () => void;
   onApply: () => void;
@@ -21,6 +23,11 @@ export default function OverseerPanel(p: Props) {
   const { proposal, preview, before } = p;
   const rejected = new Map(preview?.rejected.map((r) => [r.edit, r.why]));
   const usable = preview?.applied.length ?? 0;
+  const was = before?.metrics;
+  const now = p.after.metrics;
+  // Last person out is not a like-for-like time when the head counts differ: someone who was
+  // trapped before and now walks out late makes it longer. So also time the same number of people.
+  const same = was ? Math.min(was.evacuated, now.evacuated) : 0;
 
   return (
     <section className="card panel overseer">
@@ -71,7 +78,7 @@ export default function OverseerPanel(p: Props) {
         </>
       )}
 
-      {before && (
+      {before && was && (
         <>
           <h3 className="eyebrow">Before and after</h3>
           <table className="table">
@@ -85,29 +92,48 @@ export default function OverseerPanel(p: Props) {
             <tbody>
               <tr>
                 <td>Got out</td>
-                <td className="num">{before.evacuated}</td>
-                <td className="num">{p.after.evacuated}</td>
+                <td className="num">{was.evacuated}</td>
+                <td className="num">{now.evacuated}</td>
               </tr>
               <tr>
                 <td>Trapped</td>
-                <td className="num">{before.trapped}</td>
-                <td className="num">{p.after.trapped}</td>
+                <td className="num">{was.trapped}</td>
+                <td className="num">{now.trapped}</td>
+              </tr>
+              <tr title="How long each run took to get this many people out">
+                <td>First {same} out</td>
+                <td className="num">{seconds(timeToEvacuate(before, same))}</td>
+                <td className="num">{seconds(timeToEvacuate(p.after, same))}</td>
               </tr>
               <tr>
                 <td>Last person out</td>
-                <td className="num">{seconds(before)}</td>
-                <td className="num">{seconds(p.after)}</td>
+                <td className="num">{seconds(was.evacuated > 0 ? was.evacTimeSec : null)}</td>
+                <td className="num">{seconds(now.evacuated > 0 ? now.evacTimeSec : null)}</td>
               </tr>
             </tbody>
           </table>
+          {now.evacuated > was.evacuated && now.evacTimeSec > was.evacTimeSec && (
+            <p className="hint">
+              The last person left later because {now.evacuated - was.evacuated} more{" "}
+              {now.evacuated - was.evacuated === 1 ? "person" : "people"} got out, and they were the slowest to reach an exit.
+              Compare the time for the first {same}.
+            </p>
+          )}
         </>
       )}
     </section>
   );
 }
 
-function seconds(m: RunMetrics): string {
-  return m.evacuated > 0 ? `${m.evacTimeSec.toFixed(1)} s` : "–";
+function seconds(s: number | null): string {
+  return s === null ? "–" : `${s.toFixed(1)} s`;
+}
+
+// Seconds until `count` people had got out, or null if that never happened.
+function timeToEvacuate(rec: Recording, count: number): number | null {
+  if (count <= 0) return null;
+  for (let f = 0; f < rec.frames; f++) if (rec.evacuated[f] >= count) return f * TICK_S;
+  return null;
 }
 
 function describeEdit(e: BuildingEdit): string {

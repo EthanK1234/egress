@@ -1,5 +1,4 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
-import { getOverseerProposal } from "./ai/overseer";
 import LayerPanel from "./components/LayerPanel";
 import MapCanvas from "./components/MapCanvas";
 import OverseerPanel from "./components/OverseerPanel";
@@ -15,7 +14,7 @@ import { DEFAULT_AGENT_COUNT, DEFAULT_SEED, TICK_S, WALL } from "./sim/config";
 import { finishRecording, recordStep, startRecording, type Recorder, type Recording } from "./sim/recording";
 import { applyEdits, remapScenario } from "./sim/edits";
 import { testMap } from "./sim/testMap";
-import type { Behavior, Building, OverseerProposal, RunMetrics } from "./sim/types";
+import type { Behavior, Building, OverseerProposal } from "./sim/types";
 
 const originalBuilding = testMap;
 const NO_RINGS: { x: number; y: number }[] = [];
@@ -34,7 +33,7 @@ export default function App() {
   const [asking, setAsking] = useState(false);
   const [askError, setAskError] = useState<string | null>(null);
   const [replay, setReplay] = useState(false);
-  const [before, setBefore] = useState<RunMetrics | null>(null); // metrics of the run the edits were applied to
+  const [before, setBefore] = useState<Recording | null>(null); // the run the edits were applied to
   const askId = useRef(0);
   const recorder = useRef<Recorder | null>(null);
   const playback = usePlayback(recording?.frames ?? 0);
@@ -97,6 +96,8 @@ export default function App() {
     setAsking(true);
     setAskError(null);
     try {
+      // Loaded on first use, so the Gemini SDK stays out of the startup bundle.
+      const { getOverseerProposal } = await import("./ai/overseer");
       const result = await getOverseerProposal(recording.building, recording.scenario, recording.metrics, { replay });
       if (id === askId.current) setProposal(result);
     } catch (err) {
@@ -109,7 +110,7 @@ export default function App() {
   // Applies the proposal to the original building and re-runs the same scenario (same seed).
   const applyProposal = () => {
     if (!recording || !preview || preview.applied.length === 0) return;
-    setBefore(recording.metrics);
+    setBefore(recording);
     setBuilding(preview.building);
     recorder.current = startRecording(preview.building, remapScenario(recording.scenario, preview.exitIdMap));
     setRecording(null);
@@ -253,7 +254,7 @@ export default function App() {
             <LayerPanel layers={layers} onChange={setLayers} counts={counts} />
           </section>
 
-          {!recording && (
+          {!recording && !before && (
             <ScenarioPanel
               seed={seed}
               agentCount={agentCount}
@@ -266,10 +267,12 @@ export default function App() {
               onRun={run}
             />
           )}
-          {recording && !showResults && (
+          {(recording || before) && !showResults && (
             <section className="card panel">
               <h2 className="eyebrow">Results</h2>
-              <p className="hint">Shown when the run reaches the end. Use the skip button to jump there.</p>
+              <p className="hint">
+                {recording ? "Shown when the run reaches the end. Use the skip button to jump there." : "Re-running with the edits applied…"}
+              </p>
             </section>
           )}
           {showResults && (
@@ -287,7 +290,7 @@ export default function App() {
               error={askError}
               replay={replay}
               before={before}
-              after={recording.metrics}
+              after={recording}
               onReplay={setReplay}
               onAsk={ask}
               onApply={applyProposal}

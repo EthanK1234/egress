@@ -6,10 +6,13 @@ import { recordTick, recordVisit } from "./metrics";
 import { createRng, shuffle, type Rng } from "./rng";
 import type { Agent, Behavior, Building, Scenario } from "./types";
 
+const FIRE_SEED_SALT = 0x9e3779b9; // gives the fire its own random stream from the same seed
+
 export interface SimState {
   building: Building;
   scenario: Scenario;
-  rng: Rng;
+  rng: Rng; // agents
+  fireRng: Rng; // fire only, so the fire spreads identically however the crowd moves
   tick: number;
   done: boolean;
   agents: Agent[];
@@ -60,7 +63,7 @@ export function createSim(building: Building, scenario: Scenario): SimState {
   for (const e of exits) exitUsage[e.id] = 0;
 
   const s: SimState = {
-    building, scenario, rng, tick: 0, done: false, agents, exits,
+    building, scenario, rng, fireRng: createRng(scenario.seed ^ FIRE_SEED_SALT), tick: 0, done: false, agents, exits,
     fire, blocked, occ,
     density: new Float32Array(n),
     globalField: new Float32Array(n),
@@ -91,7 +94,7 @@ export function step(s: SimState): void {
   const w = s.building.width;
 
   if (s.tick > 0) {
-    const lit = spreadFire(s.building, s.fire, s.rng);
+    const lit = spreadFire(s.building, s.fire, s.fireRng);
     for (const i of lit) s.blocked[i] = 1;
     if (lit.length) s.fieldsDirty = true;
   }
