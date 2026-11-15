@@ -30,6 +30,7 @@ export default function App() {
   const [simulatedSec, setSimulatedSec] = useState(0);
   // testMap is the same plan as the first entry in MAPS, so the app has a building before any file loads.
   const [mapId, setMapId] = useState(MAPS[0].id);
+  const [importedName, setImportedName] = useState<string | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
   const [original, setOriginal] = useState<Building>(testMap); // the picked floor plan, unedited
   const [building, setBuilding] = useState<Building>(testMap); // the original, or the overseer's fixed version
@@ -136,14 +137,34 @@ export default function App() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const loaded = parseBuilding(await res.json());
       if (loadId !== mapLoadId.current) return;
-      setMapId(id);
-      setOriginal(loaded);
-      setBuilding(loaded);
-      setFireStarts([]);
+      showMap(loaded, id, null);
     } catch (err) {
       if (loadId !== mapLoadId.current) return;
       setMapError(`Could not load "${map.name}": ${err instanceof Error ? err.message : String(err)}`);
     }
+  };
+
+  // Loads a floor plan from a JSON file the user picked.
+  const importMap = async (file: File) => {
+    if (recording || computing) return;
+    const loadId = ++mapLoadId.current;
+    setMapError(null);
+    try {
+      const loaded = parseBuilding(JSON.parse(await file.text()));
+      if (loadId === mapLoadId.current) showMap(loaded, "", file.name);
+    } catch (err) {
+      if (loadId !== mapLoadId.current) return;
+      const why = err instanceof SyntaxError ? "the file is not valid JSON" : err instanceof Error ? err.message : String(err);
+      setMapError(`Could not import ${file.name}: ${why}`);
+    }
+  };
+
+  const showMap = (loaded: Building, id: string, fileName: string | null) => {
+    setMapId(id);
+    setImportedName(fileName);
+    setOriginal(loaded);
+    setBuilding(loaded);
+    setFireStarts([]);
   };
 
   const toggleFire = (x: number, y: number) => {
@@ -286,7 +307,9 @@ export default function App() {
               maps={MAPS}
               mapId={mapId}
               mapError={mapError}
+              importedName={importedName}
               onMap={pickMap}
+              onImport={importMap}
               seed={seed}
               agentCount={agentCount}
               fireCount={fireStarts.length}
