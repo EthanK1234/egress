@@ -4,13 +4,15 @@ import type { MapInfo } from "../sim/maps";
 interface Props {
   maps: MapInfo[];
   mapId: string;
-  mapError: string | null; // why the last picked map could not be loaded
+  mapError: string | null; // why the last picked or imported map could not be loaded
+  importedName: string | null; // file name of the imported floor plan, while it is the one in use
   seed: number;
   agentCount: number;
   fireCount: number;
   busy: boolean; // the run is being computed
   simulatedSec: number; // sim time computed so far, while busy
   onMap: (id: string) => void;
+  onImport: (file: File) => void;
   onSeed: (v: number) => void;
   onAgentCount: (v: number) => void;
   onClearFire: () => void;
@@ -39,6 +41,22 @@ export default function ScenarioPanel(p: Props) {
             </button>
           ))}
         </div>
+      </div>
+      <div className="fire-row">
+        <span>{p.importedName ? `Using ${p.importedName}` : "Or use your own layout"}</span>
+        <label className={p.busy ? "file-button disabled" : "file-button"}>
+          Import JSON
+          <input
+            type="file"
+            accept=".json,application/json"
+            disabled={p.busy}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) p.onImport(file);
+              e.target.value = ""; // so the same file can be picked again after fixing it
+            }}
+          />
+        </label>
       </div>
       {p.mapError && <p className="hint">{p.mapError}</p>}
       <div className="fields">

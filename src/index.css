@@ -792,6 +792,34 @@ input[type="number"]:disabled {
   border-color: var(--text-2);
 }
 
+.file-button {
+  position: relative;
+  padding: 4px 10px;
+  font-size: 13px;
+  color: var(--text-2);
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.file-button:hover,
+.file-button:focus-within {
+  color: var(--text);
+  border-color: var(--text-3);
+}
+
+.file-button.disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.file-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
 .fire-row {
   display: flex;
   align-items: center;
