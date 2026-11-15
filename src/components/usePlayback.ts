@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { TICK_S } from "../sim/config";
 
-export const SPEEDS = [0.5, 1, 2, 4, 8, 16];
+export const SPEEDS = [1, 2, 4, 8];
 const DEFAULT_SPEED = 4;
 
 export interface Playback {

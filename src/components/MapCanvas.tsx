@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { BEHAVIORS, BEHAVIOR_COLOR, COLOR, rgb255 } from "../render/palette";
 import { PATH_ALPHA, pathLayers } from "../render/paths";
 import { FIRE_FRONT_FRAMES, FIRE_SETTLE_FRAMES, RING_RADIUS, type Layers } from "../render/view";
-import { WALL } from "../sim/config";
 import { findExits } from "../sim/flowfield";
 import { EVACUATED, FROZEN, TRAPPED, type Recording } from "../sim/recording";
 import type { Building } from "../sim/types";
@@ -24,7 +23,7 @@ const FIRE_RGB = rgb255(COLOR.fire);
 const FIRE_FRONT_RGB = rgb255(COLOR.fireTip);
 const FIRE_OLD_RGB = rgb255(COLOR.ember);
 const FIRE_OLD_MIX = 0.45; // how far settled fire darkens
-const FONT = "Kazesawa, 'Segoe UI', sans-serif";
+const FONT = "Figtree, 'Segoe UI', sans-serif";
 const TAU = Math.PI * 2;
 
 // One color channel (0..2) of a cell that has burned for `age` frames:
@@ -240,10 +239,21 @@ export default function MapCanvas({ building, recording, fireStarts, playhead, l
       ctx.strokeStyle = COLOR.trapped;
       ctx.lineWidth = 1.5;
       ctx.stroke();
+
+      // The person picked out in the list gets a ring.
+      const picked = layers.selected;
+      if (picked !== null && picked < n && rec.status[f0 * n + picked] !== EVACUATED) {
+        const [x, y] = at(picked);
+        ctx.beginPath();
+        ctx.arc(x, y, radius + 4, 0, TAU);
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
     }
 
-    // 6. The cell under the pointer, while fire starts can be placed.
-    if (onCellClick && hover && cells[hover[1] * w + hover[0]] !== WALL) {
+    // 6. The cell under the pointer, while the layout can be edited.
+    if (onCellClick && hover) {
       ctx.strokeStyle = "#ffffff";
       ctx.lineWidth = 1;
       ctx.strokeRect(Math.round(hover[0] * cell) + 0.5, Math.round(hover[1] * cell) + 0.5, Math.round(cell), Math.round(cell));

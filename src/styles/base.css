@@ -1,0 +1,342 @@
+/* Page defaults and the shared building blocks: text styles, cards, buttons, inputs,
+   switches, chips, segmented controls, tables. */
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--fs-body);
+  font-weight: 400;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h2,
+h3,
+p,
+dl,
+dd,
+ul,
+ol {
+  margin: 0;
+}
+
+i {
+  font-style: normal;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Text. A card's title is an h2; a section label inside it is an h3 in small caps. */
+
+.eyebrow,
+.caps {
+  font-size: var(--fs-caps);
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+h2.eyebrow {
+  font-size: var(--fs-title);
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--text);
+}
+
+.hint {
+  font-size: var(--fs-ui);
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Cards */
+
+.card {
+  background: var(--bg);
+  border-radius: var(--radius);
+  box-shadow: var(--raised);
+}
+
+.panel {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  padding: 20px;
+}
+
+.dot {
+  display: inline-block;
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.dot.square {
+  border-radius: 3px;
+}
+
+/* Buttons: raised at rest, pressed in while held. The label is always dark and bold,
+   so a button never depends on its shadow alone to be recognised. */
+
+button {
+  height: 44px;
+  padding: 0 22px;
+  font: inherit;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  color: var(--text);
+  background: var(--bg);
+  border: 0;
+  border-radius: var(--radius-control);
+  box-shadow: var(--raised-sm);
+  cursor: pointer;
+  transition: box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+button:active:not(:disabled) {
+  transform: none;
+  box-shadow: var(--pressed-sm);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+button.primary {
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+
+button.primary:active:not(:disabled) {
+  box-shadow: inset 3px 3px 7px rgba(0, 0, 0, 0.28);
+}
+
+button.wide {
+  width: 100%;
+}
+
+button.small {
+  height: 36px;
+  padding: 0 16px;
+  font-size: var(--fs-ui);
+}
+
+button.quiet {
+  height: auto;
+  padding: 4px 8px;
+  font-size: var(--fs-ui);
+  color: var(--text-2);
+  background: none;
+  box-shadow: none;
+}
+
+button.quiet:hover:not(:disabled) {
+  color: var(--text);
+  transform: none;
+}
+
+.icon-button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.icon-button.large {
+  width: 52px;
+  height: 52px;
+}
+
+.icon-button.on {
+  color: var(--accent);
+  box-shadow: var(--pressed-sm);
+}
+
+/* Inputs sit in a well */
+
+input[type="number"] {
+  box-sizing: border-box;
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--bg);
+  border: 0;
+  border-radius: var(--radius-control);
+  box-shadow: var(--pressed-sm);
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+input[type="number"]:disabled {
+  opacity: 0.5;
+}
+
+/* On/off switch. On is shown with the accent color, not with depth alone. */
+
+.switch {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: 44px;
+  height: 24px;
+}
+
+.switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.switch i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  box-shadow: var(--pressed-sm);
+  transition: background 0.16s ease;
+}
+
+.switch i::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--bg);
+  box-shadow: 2px 2px 4px var(--shade), -1px -1px 3px var(--glow);
+  transition: transform 0.16s ease;
+}
+
+.switch input:checked + i {
+  background: var(--on, var(--accent));
+  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.22);
+}
+
+.switch input:checked + i::after {
+  transform: translateX(20px);
+  box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.switch input:focus-visible + i {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.layer-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--fs-ui);
+  font-weight: 500;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+/* Segmented control: a well with one raised option */
+
+.segmented {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-inner);
+  box-shadow: var(--pressed-sm);
+}
+
+.segment {
+  height: 36px;
+  padding: 0 12px;
+  font-size: var(--fs-ui);
+  color: var(--text-3);
+  background: none;
+  border-radius: 10px;
+  box-shadow: none;
+  white-space: nowrap;
+}
+
+.segment:hover:not(:disabled) {
+  color: var(--text);
+  transform: none;
+}
+
+.segment.on {
+  color: var(--text);
+  box-shadow: var(--raised-sm);
+}
+
+/* Tables: no boxes, just rows */
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-ui);
+}
+
+.table th {
+  padding: 0 0 8px;
+  font-size: var(--fs-caps);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-align: left;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.table td {
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+}
+
+.table .num {
+  padding-left: 12px;
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.table .rank {
+  width: 36px;
+  font-weight: 600;
+}

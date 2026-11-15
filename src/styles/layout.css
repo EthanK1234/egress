@@ -1,0 +1,196 @@
+/* The page: a top bar, then the 3D view (with the numbers above it) beside a column of panels.
+   A bento-style layout would mostly be a different grid here. */
+
+.app {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+}
+
+.topbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 24px;
+  height: 60px;
+  padding: 0 32px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.brand-mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-radius: 11px;
+  box-shadow: var(--raised-sm);
+}
+
+.wordmark {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.tagline {
+  overflow: hidden;
+  font-size: var(--fs-small);
+  font-weight: 500;
+  color: var(--text-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-side {
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: 16px;
+}
+
+/* Progress through the pipeline. Not a control, so it is flat: only the current step is raised. */
+.steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px 6px 6px;
+  font-size: var(--fs-ui);
+  font-weight: 500;
+  color: var(--text-3);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.step-mark {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  font-size: var(--fs-caps);
+  font-weight: 700;
+  border-radius: 50%;
+  box-shadow: var(--pressed-sm);
+}
+
+.step.done .step-mark {
+  color: var(--accent);
+}
+
+.step.current {
+  font-weight: 600;
+  color: var(--text);
+  box-shadow: var(--raised-sm);
+}
+
+.step.current .step-mark {
+  color: var(--accent-ink);
+  background: var(--accent);
+  box-shadow: none;
+}
+
+.stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 392px;
+  gap: var(--gap);
+  min-height: 0;
+  padding: 20px 32px 28px;
+}
+
+.main-col {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--gap);
+  min-width: 0;
+  min-height: 0;
+}
+
+/* The 3D view and its playback controls are one object, like a screen with its buttons. */
+.player {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 12px;
+  min-height: 0;
+  padding: 12px;
+  border-radius: 26px;
+}
+
+/* The column scrolls if it has to. The padding leaves room for the cards' shadows,
+   which a scrolling box would otherwise cut off; the margin puts the cards back in place. */
+.side-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  min-height: 0;
+  margin: -20px -24px -28px;
+  padding: 20px 24px 28px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #c3ccd8 transparent;
+}
+
+.side-col > * {
+  flex: none;
+}
+
+/* Under the floor plan the column shows one thing at a time, chosen with the tabs.
+   Panels that come from elsewhere are hidden here rather than where they are rendered. */
+.side-col[data-tab="results"] > .overseer,
+.side-col[data-tab="people"] > .overseer {
+  display: none;
+}
+
+/* The tab already names the panel. */
+.side-col[data-tab] > .overseer > h2.eyebrow {
+  display: none;
+}
+
+/* Narrow windows: stack the panels under the 3D view and let the page scroll. */
+@media (max-width: 1100px) {
+  body {
+    overflow: auto;
+  }
+
+  .app {
+    height: auto;
+    min-height: 100%;
+  }
+
+  .topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .steps {
+    display: none;
+  }
+
+  .stage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .main-col {
+    grid-template-rows: auto 64vh;
+  }
+
+  .side-col {
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+  }
+}
