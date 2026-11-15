@@ -45,12 +45,12 @@ interface OverseerProposal { diagnosis: string; edits: BuildingEdit[]; expectedI
 ```
 
 ## Folders
-- src/sim/: pure TypeScript, no React or DOM imports (types, config, rng, fire, flowfield, agents, sim, metrics, recording, edits, testMap)
+- src/sim/: pure TypeScript, no React or DOM imports (types, config, rng, fire, flowfield, agents, sim, metrics, recording, edits, maps, testMap)
 - src/render/: drawing code shared by both views, no React (palette, view, paths, mat4, camera, meshes, shaders, renderer)
 - src/ai/: Gemini calls (gemini.ts client, floorplan.ts, overseer.ts)
-- src/components/: React UI (Viewport3D, MapCanvas, Transport, Readout, LayerPanel, ScenarioPanel, ResultsPanel, Switch, usePlayback)
+- src/components/: React UI (Viewport3D, MapCanvas, Transport, Readout, LayerPanel, ScenarioPanel, ResultsPanel, OverseerPanel, Switch, usePlayback)
 - public/fonts/: Kazesawa font files and licence
-- public/venue.json: backup venue map
+- public/maps/: example floor plans as Building JSON (two-rooms, office, venue), listed in src/sim/maps.ts
 - public/cache/: saved Gemini responses for offline demo
 
 ## Coding rules

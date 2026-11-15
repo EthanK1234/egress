@@ -13,10 +13,10 @@ import { DEFAULT_LAYERS, type Layers } from "./render/view";
 import { DEFAULT_AGENT_COUNT, DEFAULT_SEED, TICK_S, WALL } from "./sim/config";
 import { finishRecording, recordStep, startRecording, type Recorder, type Recording } from "./sim/recording";
 import { applyEdits, remapScenario } from "./sim/edits";
+import { MAPS, parseBuilding } from "./sim/maps";
 import { testMap } from "./sim/testMap";
 import type { Behavior, Building, OverseerProposal } from "./sim/types";
 
-const originalBuilding = testMap;
 const NO_RINGS: { x: number; y: number }[] = [];
 const SLICE_MS = 12; // time spent computing the run per animation frame, so the page stays responsive
 
@@ -28,7 +28,12 @@ export default function App() {
   const [recording, setRecording] = useState<Recording | null>(null);
   const [computing, setComputing] = useState(false);
   const [simulatedSec, setSimulatedSec] = useState(0);
-  const [building, setBuilding] = useState<Building>(originalBuilding); // the original, or the overseer's fixed version
+  // testMap is the same plan as the first entry in MAPS, so the app has a building before any file loads.
+  const [mapId, setMapId] = useState(MAPS[0].id);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const [original, setOriginal] = useState<Building>(testMap); // the picked floor plan, unedited
+  const [building, setBuilding] = useState<Building>(testMap); // the original, or the overseer's fixed version
+  const mapLoadId = useRef(0);
   const [proposal, setProposal] = useState<OverseerProposal | null>(null);
   const [asking, setAsking] = useState(false);
   const [askError, setAskError] = useState<string | null>(null);
@@ -66,6 +71,7 @@ export default function App() {
 
   const run = () => {
     if (recording || computing) return;
+    mapLoadId.current++; // a floor plan still loading must not replace the building mid-run
     recorder.current = startRecording(building, { seed, agentCount, fireStarts, blockedExits: [] });
     setSimulatedSec(0);
     setComputing(true);
@@ -73,7 +79,7 @@ export default function App() {
 
   const reset = () => {
     askId.current++;
-    setBuilding(originalBuilding);
+    setBuilding(original);
     setProposal(null);
     setAsking(false);
     setAskError(null);
@@ -84,7 +90,7 @@ export default function App() {
     playback.reset();
   };
 
-  const preview = useMemo(() => (proposal ? applyEdits(originalBuilding, proposal.edits) : null), [proposal]);
+  const preview = useMemo(() => (proposal ? applyEdits(original, proposal.edits) : null), [proposal, original]);
   const proposed = useMemo(
     () => (before || !preview ? undefined : preview.applied.flatMap((a) => a.cells)),
     [before, preview],
@@ -117,6 +123,27 @@ export default function App() {
     playback.reset();
     setSimulatedSec(0);
     setComputing(true);
+  };
+
+  // Switches floor plan. Only offered before a run, so there is no run or proposal to clear.
+  const pickMap = async (id: string) => {
+    const map = MAPS.find((m) => m.id === id);
+    if (!map || recording || computing) return;
+    const loadId = ++mapLoadId.current;
+    setMapError(null);
+    try {
+      const res = await fetch(map.url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const loaded = parseBuilding(await res.json());
+      if (loadId !== mapLoadId.current) return;
+      setMapId(id);
+      setOriginal(loaded);
+      setBuilding(loaded);
+      setFireStarts([]);
+    } catch (err) {
+      if (loadId !== mapLoadId.current) return;
+      setMapError(`Could not load "${map.name}": ${err instanceof Error ? err.message : String(err)}`);
+    }
   };
 
   const toggleFire = (x: number, y: number) => {
@@ -256,6 +283,10 @@ export default function App() {
 
           {!recording && !before && (
             <ScenarioPanel
+              maps={MAPS}
+              mapId={mapId}
+              mapError={mapError}
+              onMap={pickMap}
               seed={seed}
               agentCount={agentCount}
               fireCount={fireStarts.length}

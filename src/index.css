@@ -774,6 +774,24 @@ input[type="number"]:disabled {
   color: var(--text-3);
 }
 
+.choices {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 6px;
+}
+
+.choice {
+  justify-content: center;
+  padding: 6px 8px;
+  color: var(--text-2);
+}
+
+.choice.on {
+  color: var(--text);
+  border-color: var(--text-2);
+}
+
 .fire-row {
   display: flex;
   align-items: center;

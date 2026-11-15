@@ -1,11 +1,16 @@
 import { COLOR } from "../render/palette";
+import type { MapInfo } from "../sim/maps";
 
 interface Props {
+  maps: MapInfo[];
+  mapId: string;
+  mapError: string | null; // why the last picked map could not be loaded
   seed: number;
   agentCount: number;
   fireCount: number;
   busy: boolean; // the run is being computed
   simulatedSec: number; // sim time computed so far, while busy
+  onMap: (id: string) => void;
   onSeed: (v: number) => void;
   onAgentCount: (v: number) => void;
   onClearFire: () => void;
@@ -19,6 +24,23 @@ export default function ScenarioPanel(p: Props) {
   return (
     <section className="card panel">
       <h2 className="eyebrow">Scenario</h2>
+      <div className="field">
+        Floor plan
+        <div className="choices" role="group" aria-label="Floor plan">
+          {p.maps.map((m) => (
+            <button
+              key={m.id}
+              className={m.id === p.mapId ? "choice on" : "choice"}
+              aria-pressed={m.id === p.mapId}
+              disabled={p.busy}
+              onClick={() => p.onMap(m.id)}
+            >
+              {m.name}
+            </button>
+          ))}
+        </div>
+      </div>
+      {p.mapError && <p className="hint">{p.mapError}</p>}
       <div className="fields">
         <label className="field">
           People
