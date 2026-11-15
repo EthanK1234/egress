@@ -8,7 +8,7 @@ import { FIRE_FRONT_FRAMES, FIRE_SETTLE_FRAMES } from "./view";
 const SHADE = `
 const vec3 LIGHT = vec3(-0.249, 0.798, 0.549);
 float shade(vec3 n) {
-  return min(0.55 + 0.45 * max(dot(n, LIGHT), 0.0) / LIGHT.y, 1.0);
+  return min(0.66 + 0.4 * max(dot(n, LIGHT), 0.0) / LIGHT.y, 1.0);
 }`;
 
 // Shared by walls, people and flames: the vertex shader has already picked the color.
@@ -123,10 +123,15 @@ uniform vec3 uUp;
 uniform vec2 uTan;
 uniform vec3 uHorizon;
 uniform vec3 uZenith;
+uniform vec3 uNadir;
 out vec4 outColor;
 void main() {
   vec3 dir = normalize(uForward + uRight * (vNdc.x * uTan.x) + uUp * (vNdc.y * uTan.y));
-  vec3 color = mix(uHorizon, uZenith, smoothstep(0.0, 0.6, dir.y));
+  // Brightest at the horizon: up to the zenith above it, down to the dark ground below it.
+  // The ground outside the building is see-through, so the lower half shows wherever there is no floor.
+  vec3 color = dir.y >= 0.0
+    ? mix(uHorizon, uZenith, smoothstep(0.0, 0.5, dir.y))
+    : mix(uHorizon, uNadir, smoothstep(0.0, 0.6, -dir.y));
   // A little noise, so the slow dark gradient doesn't show bands.
   float noise = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
   outColor = vec4(color + noise / 255.0, 1.0);
@@ -198,12 +203,14 @@ void main() {
       color = mix(color, vec3(1.0), uRings[i].w * (1.0 - smoothstep(0.06, 0.06 + coarse * 1.5, d)));
     }
   } else {
-    // Outside the building: a faint metre grid that fades into the background.
+    // Outside the building: only a faint metre grid, fading out with distance. The rest is see-through,
+    // so the sky's lower half shows through. Drawn with blending; inside the building is opaque.
     vec2 away = max(max(-vWorld, vWorld - uSize), vec2(0.0));
     float fade = 1.0 - smoothstep(0.0, uMargin, length(away));
     float metre = gridLines(vWorld * 0.5, pixel * 0.5) * (1.0 - smoothstep(0.5, 1.0, coarse));
     float fiveMetres = gridLines(vWorld * 0.1, pixel * 0.1);
-    color = uBackground + vec3(metre * 0.03 + fiveMetres * 0.05) * fade * fade;
+    outColor = vec4(vec3(0.78), (metre * 0.04 + fiveMetres * 0.07) * fade * fade);
+    return;
   }
   outColor = vec4(color, 1.0);
 }`;

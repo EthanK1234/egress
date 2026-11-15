@@ -29,25 +29,9 @@
   --radius-inner: 14px;
 }
 
-/* The wash: three soft glows, in navy-blue, steel blue and tangerine, on a pale page.
-   It is fixed to the window, so scrolling the side column never repaints it. */
+/* The page: one flat, pale blue-grey. */
 body {
-  background: #eef2f7;
-}
-
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background:
-    radial-gradient(46% 58% at 6% 10%, rgba(61, 90, 128, 0.62), transparent 72%),
-    radial-gradient(40% 50% at 96% 6%, rgba(228, 87, 46, 0.48), transparent 72%),
-    radial-gradient(50% 60% at 80% 96%, rgba(98, 152, 196, 0.62), transparent 72%),
-    radial-gradient(44% 54% at 30% 100%, rgba(228, 87, 46, 0.3), transparent 72%),
-    radial-gradient(36% 44% at 55% 45%, rgba(152, 193, 217, 0.45), transparent 72%),
-    linear-gradient(160deg, #e9eff6, #dfe7f1);
-  pointer-events: none;
+  background: #e4eaf1;
 }
 
 /* Only the big panes are frosted. */

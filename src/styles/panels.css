@@ -1044,3 +1044,21 @@
   line-height: 1.5;
   color: var(--text-2);
 }
+
+/* How to move around the 3D view, quietly in the top-left corner (under the tools while editing) */
+.viewport-help {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--screen-text-2);
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+.viewport:has(.toolbar) .viewport-help,
+.viewport:has(.viewport-tag) .viewport-help {
+  top: 54px;
+}

@@ -23,7 +23,7 @@ const FP_FOV = (72 * Math.PI) / 180;
 const FP_TILT = 0.24; // how far a first-person view looks down, so the floor ahead is in frame
 const DEFAULT_YAW = -0.38;
 const DEFAULT_PITCH = 0.92;
-const MIN_PITCH = 0.3;
+const MIN_PITCH = 0.1; // low enough to look out to the horizon and the sky
 const MAX_PITCH = 1.5;
 const FILL = 0.9; // share of the view the building takes up in the overview
 
@@ -95,9 +95,36 @@ export function orbit(c: Camera, dYaw: number, dPitch: number): void {
   c.pitch = Math.min(MAX_PITCH, Math.max(MIN_PITCH, c.pitch + dPitch));
 }
 
+const MIN_ZOOM = 0.06; // closest zoom, as a share of the overview distance
+const MAX_ZOOM = 2.5;
+
 // `fitDist` is the overview distance; zoom stays within a sensible range of it.
-export function zoom(c: Camera, factor: number, fitDist: number): void {
-  c.dist = Math.min(fitDist * 2.5, Math.max(fitDist * 0.25, c.dist * factor));
+// With a `focus` point, the camera closes in on that point rather than on the middle of the view:
+// the point stays under the pointer while everything else scales around it.
+export function zoom(c: Camera, factor: number, fitDist: number, focus?: Vec3 | null): void {
+  const next = Math.min(fitDist * MAX_ZOOM, Math.max(fitDist * MIN_ZOOM, c.dist * factor));
+  const f = next / c.dist;
+  if (focus) {
+    c.tx += (focus[0] - c.tx) * (1 - f);
+    c.tz += (focus[2] - c.tz) * (1 - f);
+  }
+  c.dist = next;
+}
+
+// Moves the point the camera circles, keeping it within `bounds` (x0, z0, x1, z1) so the view can't be lost.
+export function pan(c: Camera, dx: number, dz: number, bounds: [number, number, number, number]): void {
+  c.tx = Math.min(bounds[2], Math.max(bounds[0], c.tx + dx));
+  c.tz = Math.min(bounds[3], Math.max(bounds[1], c.tz + dz));
+}
+
+// The point on the floor being shown under a point of the view, or null if that part of the view
+// looks at the sky (or so far off that it isn't useful).
+export function floorPoint(c: Camera, aspect: number, nx: number, ny: number): Vec3 | null {
+  const { origin, dir } = screenRay(c, aspect, nx, ny);
+  if (dir[1] > -0.02) return null;
+  const t = (c.ty - origin[1]) / dir[1];
+  if (t > c.dist + c.reach * 2) return null;
+  return [origin[0] + dir[0] * t, c.ty, origin[2] + dir[2] * t];
 }
 
 // The ray under a point of the view, for the orbit camera.

@@ -20,7 +20,7 @@ export const BEHAVIOR_COLOR: Record<Behavior, string> = {
 
 export const COLOR = {
   background: "#0b0e12",
-  floor: "#161c24",
+  floor: "#1b222c",
   door: "#626c7a",
   wall: "#8a95a6", // 2D map
   wallTop: "#a7b2c2", // 3D view
@@ -30,7 +30,8 @@ export const COLOR = {
   furnitureTop: "#9a846b", // 3D view: tables and chairs
   furnitureSide: "#5f5040",
   storey: "#2b333f", // walls of the floors under the one being shown
-  sky: "#1d2836", // overhead; the sky fades down to `background` at the horizon, where the ground ends
+  sky: "#16202d", // overhead
+  skyHorizon: "#2d3d54", // a soft glow at the horizon; below it the sky fades back down to `background`
   slab: "#0f141a", // ground level inside the building, when the floor shown is above it
   exit: "#12a150",
   fire: "#d03b3b",

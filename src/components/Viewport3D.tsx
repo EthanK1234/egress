@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { cellsBetween, type Tool } from "../editor/layout";
-import { fitCamera, orbit, screenRay, zoom, type Camera } from "../render/camera";
+import { fitCamera, floorPoint, orbit, pan, screenRay, zoom, type Camera } from "../render/camera";
 import { project } from "../render/mat4";
 import { EXIT_POST_HEIGHT, FLOOR_SPACING, PAWN_HEIGHT, wallHeightAt } from "../render/meshes";
 import { COLOR } from "../render/palette";
@@ -120,7 +120,7 @@ export default function Viewport3D(props: Props) {
   const look = useRef({ id: -1, dx: 0, dz: -1 }); // which way the first-person view faces, turned smoothly
   const raf = useRef(0);
   // The press in progress: where it started, where the pointer was last, and what it is doing.
-  const press = useRef<{ x0: number; y0: number; x: number; y: number; button: number; dragged: boolean; painting: boolean } | null>(null);
+  const press = useRef<{ x0: number; y0: number; x: number; y: number; button: number; dragged: boolean; painting: boolean; moving: boolean } | null>(null);
   const lastPainted = useRef<[number, number] | null>(null);
   const hoverRef = useRef<[number, number] | null>(null);
   const [hover, setHover] = useState<[number, number] | null>(null); // the cell under the pointer, for the readout
@@ -304,14 +304,23 @@ export default function Viewport3D(props: Props) {
   // Any other change (playhead, layers, markers) just needs a redraw.
   useEffect(requestDraw);
 
-  // Zoom. A native listener, because React's wheel events can't stop the page from scrolling.
+  // The point on the floor under a point of the window, or null where the view shows sky.
+  const floorAt = (clientX: number, clientY: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !camera.current) return null;
+    const r = canvas.getBoundingClientRect();
+    return floorPoint(camera.current, r.width / r.height, ((clientX - r.left) / r.width) * 2 - 1, 1 - ((clientY - r.top) / r.height) * 2);
+  };
+
+  // Zoom towards whatever is under the pointer. A native listener, because React's wheel events
+  // can't stop the page from scrolling.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const onWheel = (e: WheelEvent) => {
       if (!camera.current || latest.current.props.follow !== null) return;
       e.preventDefault();
-      zoom(camera.current, Math.exp(e.deltaY * ZOOM_SPEED), fitDist.current);
+      zoom(camera.current, Math.exp(e.deltaY * ZOOM_SPEED), fitDist.current, floorAt(e.clientX, e.clientY));
       moved.current = true;
       setCanReset(true);
       requestDraw();
@@ -320,13 +329,16 @@ export default function Viewport3D(props: Props) {
     return () => canvas.removeEventListener("wheel", onWheel);
   }, []);
 
-  // With a building tool in hand, the left button paints and the right button orbits.
-  // Otherwise dragging orbits, and a plain click with the fire tool places a fire.
+  // What a drag does:
+  // - left: orbit (or paint, with a building tool in hand); a plain click with the fire tool places a fire
+  // - right: move the view (or orbit, with a building tool in hand; Shift+right moves)
+  // - middle, or Shift with the left button: always moves the view
   const onPointerDown = (e: PointerEvent<HTMLCanvasElement>) => {
     if (follow !== null) return; // in first person the camera rides with the person
     e.currentTarget.setPointerCapture(e.pointerId);
-    const painting = e.button === 0 && editingLayout;
-    press.current = { x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, button: e.button, dragged: false, painting };
+    const painting = e.button === 0 && editingLayout && !e.shiftKey;
+    const moving = e.button === 1 || (e.button === 0 && e.shiftKey) || (e.button === 2 && (!editingLayout || e.shiftKey));
+    press.current = { x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, button: e.button, dragged: false, painting, moving };
     if (painting) {
       const cell = pick(e.clientX, e.clientY);
       lastPainted.current = cell;
@@ -346,6 +358,18 @@ export default function Viewport3D(props: Props) {
         props.onPaint?.(from ? cellsBetween(from[0], from[1], cell[0], cell[1]).slice(1) : [cell], true);
         lastPainted.current = cell;
       }
+    } else if (camera.current && p.moving) {
+      // Slide the view so the floor under the pointer follows it, like dragging a map.
+      const from = floorAt(p.x, p.y);
+      const to = floorAt(e.clientX, e.clientY);
+      if (from && to) {
+        const b = latest.current.props.building;
+        const m = Math.max(b.width, b.height) * 0.5;
+        pan(camera.current, from[0] - to[0], from[2] - to[2], [-m, -m, b.width + m, b.height + m]);
+      }
+      moved.current = true;
+      setCanReset(true);
+      requestDraw();
     } else if (camera.current) {
       orbit(camera.current, -(e.clientX - p.x) * ORBIT_SPEED, (e.clientY - p.y) * ORBIT_SPEED);
       moved.current = true;
@@ -406,6 +430,13 @@ export default function Viewport3D(props: Props) {
             {(hover[0] * CELL_M).toFixed(1)} m, {(hover[1] * CELL_M).toFixed(1)} m
           </span>
         </div>
+      )}
+      {follow === null && !(tool !== null && hover) && (
+        <p className="viewport-help">
+          {editingLayout
+            ? "Left-drag to paint · right-drag to orbit · Shift+right-drag to move · scroll to zoom"
+            : "Drag to orbit · right-drag to move · scroll to zoom"}
+        </p>
       )}
       {canReset && follow === null && (
         <button className="glass viewport-reset" onMouseDown={(e) => e.preventDefault()} onClick={resetView}>

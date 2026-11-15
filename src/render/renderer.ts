@@ -73,8 +73,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
     tan: uniform(skyProg, "uTan"),
   };
   gl.useProgram(skyProg);
-  gl.uniform3fv(uniform(skyProg, "uHorizon"), rgb(COLOR.background));
+  gl.uniform3fv(uniform(skyProg, "uHorizon"), rgb(COLOR.skyHorizon));
   gl.uniform3fv(uniform(skyProg, "uZenith"), rgb(COLOR.sky));
+  gl.uniform3fv(uniform(skyProg, "uNadir"), rgb(COLOR.background));
   const skyVao = gl.createVertexArray(); // no attributes: the shader makes the triangle from the vertex number
   const floorU = {
     viewProj: uniform(floorProg, "uViewProj"),
@@ -360,7 +361,11 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
     // and the floor itself is drawn again, lifted, on top of the storeys.
     gl.uniformMatrix4fv(floorU.viewProj, false, viewProj);
     gl.uniform1f(floorU.plain, elevation > 0 ? 1 : 0);
+    // The grid outside the building is see-through over the sky, so the ground is blended.
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.disable(gl.BLEND);
     if (elevation > 0) {
       gl.uniformMatrix4fv(floorU.viewProj, false, lifted);
       gl.uniform1f(floorU.plain, 0);

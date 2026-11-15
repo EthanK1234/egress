@@ -113,7 +113,7 @@ export default function EvacuationChart({ recording, playhead }: Props) {
 
         <line className="chart-now" x1={x(shown)} x2={x(shown)} y1={PAD.top} y2={PAD.top + PLOT_H} />
         {SERIES.map((s) => (
-          <circle key={s.key} cx={x(shown)} cy={y(values[s.key])} r={4} fill={s.color} stroke="#ffffff" strokeWidth={2} />
+          <circle key={s.key} cx={x(shown)} cy={y(values[s.key])} r={4} fill={s.color} strokeWidth={2} style={{ stroke: "var(--surface)" }} />
         ))}
       </svg>
 
