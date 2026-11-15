@@ -658,7 +658,7 @@
 
 /* People: the switches for the three kinds, then a list that fills what is left of the column */
 
-.side-col > .people {
+.side-scroll > .people {
   flex: 1 1 320px;
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 320px;

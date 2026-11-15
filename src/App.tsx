@@ -70,6 +70,7 @@ export default function App() {
   const [before, setBefore] = useState<Recording | null>(null); // the run the edits were applied to
   const askId = useRef(0);
   const recorder = useRef<Recorder | null>(null);
+  const sideScroll = useRef<HTMLDivElement>(null); // the part of the side column under the floor plan and tabs
   const playback = usePlayback(recording?.frames ?? 0);
 
   // The selected person belongs to one run, so a new run starts with nobody selected.
@@ -452,6 +453,24 @@ export default function App() {
             />
           </section>
 
+          {recording && (
+            <Segmented
+              label="Side panel"
+              options={[
+                { value: "results", label: "Results" },
+                { value: "people", label: "People" },
+                { value: "overseer", label: "Overseer", disabled: !showResults },
+              ]}
+              value={tab}
+              onChange={(next: Tab) => {
+                setTabChoice({ tab: next, run: recording });
+                sideScroll.current?.scrollTo({ top: 0 }); // each tab starts at its top
+              }}
+            />
+          )}
+
+          {/* Only this part scrolls: the floor plan and the tabs above it stay in place. */}
+          <div className="side-scroll" ref={sideScroll}>
           {!recording && !before && (
             <ScenarioPanel
               mapError={mapError}
@@ -475,18 +494,6 @@ export default function App() {
             <section className="card panel">
               <p className="hint">Re-running the same crowd with the edits applied…</p>
             </section>
-          )}
-          {recording && (
-            <Segmented
-              label="Side panel"
-              options={[
-                { value: "results", label: "Results" },
-                { value: "people", label: "People" },
-                { value: "overseer", label: "Overseer", disabled: !showResults },
-              ]}
-              value={tab}
-              onChange={(next: Tab) => setTabChoice({ tab: next, run: recording })}
-            />
           )}
           {recording && tab === "results" && <EvacuationChart recording={recording} playhead={playback.playhead} />}
           {recording && counts && tab === "people" && (
@@ -513,6 +520,7 @@ export default function App() {
               onApply={applyProposal}
             />
           )}
+          </div>
         </aside>
       </main>
     </div>

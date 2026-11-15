@@ -131,33 +131,47 @@
   border-radius: 26px;
 }
 
-/* The column scrolls if it has to. The padding leaves room for the cards' shadows,
-   which a scrolling box would otherwise cut off; the margin puts the cards back in place. */
+/* The floor plan and the tabs stay put; only the panels under them scroll. */
 .side-col {
   display: flex;
   flex-direction: column;
   gap: var(--gap);
   min-height: 0;
-  margin: -20px -24px -28px;
-  padding: 20px 24px 28px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--line-2) transparent;
 }
 
 .side-col > * {
   flex: none;
 }
 
+/* The padding leaves room for the cards' shadows, which a scrolling box would otherwise
+   cut off; the negative margin puts the cards back in place. */
+.side-col > .side-scroll {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--gap);
+  min-height: 0;
+  margin: -8px -24px -28px;
+  padding: 8px 24px 28px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+
+.side-scroll > * {
+  flex: none;
+}
+
 /* Under the floor plan the column shows one thing at a time, chosen with the tabs.
    Panels that come from elsewhere are hidden here rather than where they are rendered. */
-.side-col[data-tab="results"] > .overseer,
-.side-col[data-tab="people"] > .overseer {
+.side-col[data-tab="results"] .side-scroll > .overseer,
+.side-col[data-tab="people"] .side-scroll > .overseer {
   display: none;
 }
 
 /* The tab already names the panel. */
-.side-col[data-tab] > .overseer > h2.eyebrow {
+.side-col[data-tab] .side-scroll > .overseer > h2.eyebrow {
   display: none;
 }
 
@@ -188,7 +202,7 @@
     grid-template-rows: auto 64vh;
   }
 
-  .side-col {
+  .side-col > .side-scroll {
     margin: 0;
     padding: 0;
     overflow: visible;
