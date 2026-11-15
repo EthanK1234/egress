@@ -39,13 +39,6 @@ export function multiply(a: Mat4, b: Mat4): Mat4 {
   return out;
 }
 
-// m with everything it draws moved by (x, y, z).
-export function translated(m: Mat4, x: number, y: number, z: number): Mat4 {
-  const out = new Float32Array(m);
-  for (let r = 0; r < 4; r++) out[12 + r] = m[r] * x + m[4 + r] * y + m[8 + r] * z + m[12 + r];
-  return out;
-}
-
 // Transforms a point. Returns clip-space [x, y, z, w]; divide x and y by w for -1..1 screen coordinates.
 export function project(m: Mat4, x: number, y: number, z: number): [number, number, number, number] {
   return [

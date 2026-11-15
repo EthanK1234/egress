@@ -9,7 +9,6 @@ export const WALL_HEIGHT = 3.4;
 export const TABLE_HEIGHT = 1.5; // 0.75 m
 export const CHAIR_HEIGHT = 2.1; // top of the backrest
 export const EXIT_POST_HEIGHT = 4.1; // the wall cells either side of an exit stand a little taller
-export const FLOOR_SPACING = 4; // height from one floor to the next
 export const PAWN_HEIGHT = 2.2;
 export const PAWN_RADIUS = 0.43; // at the feet
 
@@ -111,27 +110,22 @@ export function topAt(b: Building, x: number, y: number): number {
   return cell === TABLE ? TABLE_HEIGHT : cell === CHAIR ? CHAIR_HEIGHT : wallHeightAt(b, x, y);
 }
 
-// Appends all walls of one floor. Faces between two wall cells are never seen, so they are left out.
-// `base` is the height the floor stands at. A floor under the one being shown is drawn as a storey:
-// plain dark walls that reach up to the floor above, so the stack reads as one building.
+// Appends all walls. Faces between two wall cells are never seen, so they are left out.
 // Layout: position (3), normal (3), color (3).
-export function pushWalls(out: number[], b: Building, base: number, asStorey: boolean): void {
+export function pushWalls(out: number[], b: Building): void {
   const { width: w, height: h } = b;
-  const top = rgb(asStorey ? COLOR.storey : COLOR.wallTop);
-  const side = rgb(asStorey ? COLOR.storey : COLOR.wallSide);
+  const top = rgb(COLOR.wallTop);
+  const side = rgb(COLOR.wallSide);
   const postTop = rgb(COLOR.exit);
   const postSide = postTop.map((c) => c * 0.6) as RGB;
-  // A storey stops just short of the floor above, so the two never share a surface.
-  const heightAt = (x: number, y: number) => {
-    const height = wallHeightAt(b, x, y);
-    return asStorey && height > 0 ? FLOOR_SPACING - 0.05 : height;
-  };
+  const base = 0;
+  const heightAt = (x: number, y: number) => wallHeightAt(b, x, y);
 
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const height = heightAt(x, y);
       if (height === 0) continue;
-      const isPost = !asStorey && height > WALL_HEIGHT;
+      const isPost = height > WALL_HEIGHT;
       const y1 = base + height;
       const inside: V3 = [x + 0.5, base + height / 2, y + 0.5];
       pushQuad(out, [x, y1, y], [x + 1, y1, y], [x + 1, y1, y + 1], [x, y1, y + 1], inside, isPost ? postTop : top);
@@ -255,10 +249,9 @@ export function groundMargin(b: Building): number {
   return Math.max(b.width, b.height) * 0.8;
 }
 
-// Two quads facing up: the ground under and around the building, then only the footprint of the
-// building (used for a floor that is drawn above ground level). Layout: x, z.
+// One quad facing up: the ground under and around the building. Layout: x, z.
 export function groundQuads(b: Building): Float32Array {
   const m = groundMargin(b);
-  const quad = (x0: number, z0: number, x1: number, z1: number) => [x0, z0, x0, z1, x1, z1, x0, z0, x1, z1, x1, z0];
-  return new Float32Array([...quad(-m, -m, b.width + m, b.height + m), ...quad(0, 0, b.width, b.height)]);
+  const x0 = -m, z0 = -m, x1 = b.width + m, z1 = b.height + m;
+  return new Float32Array([x0, z0, x0, z1, x1, z1, x0, z0, x1, z1, x1, z0]);
 }

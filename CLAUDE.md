@@ -17,11 +17,12 @@ No other libraries: no Tailwind, no state library, no test framework, no 3D libr
 - Playback only reads the Recording. The playhead is a fractional frame; play/pause, seek and speed never touch the sim.
 - The 3D view (main) and the 2D floor map (side) both draw from (recording, playhead, layers), so they always agree. Fire starts are placed on the 2D map.
 - Layers: show/hide people per behavior, path highlights per behavior, grid. One person can be selected (People tab) and followed in first person.
-- Layout editor (before a run): tools on the 3D view paint walls, doors, exits and fire; the cursor's cell is shown as coordinates. A layout is a stack of floors (src/editor/layout.ts). Floors are simulated one at a time; an exit on an upper floor stands for a stairwell door.
+- Layout editor (before a run): tools on the 3D view paint walls, doors, exits, tables, chairs and fire; the cursor's cell is shown as coordinates. One floor only (src/editor/layout.ts).
+- Phone layout (screens up to 700px, App renders .phone; styles in src/styles/phone.css): a view mode (header, pinned 3D view, playback, sections (Simulate, Results, Overseer) switched by a floating tab bar; the header, 3D view and seek bar scroll with the content and slide under a translucent status-bar strip) and a full-screen editor (PhoneEditor: top bar + tool tray). Upright only: a sideways phone shows "turn upright". Touch: one finger orbits or paints, two fingers pinch-zoom, slide and twist. No sideways scrolling, double-tap zoom or text selection on touch screens.
 - The numbers above the 3D view lead with Survived and Survival rate. Time is deliberately the least prominent.
 - Results appear once playback reaches the end of the run.
 - The 3D view draws only when something changed. Flames and paths are uploaded once per run and animated in the shaders from the playhead; walls are one static mesh; people and flames are instanced.
-- Look: clean white cards on an off-white page, three-color palette (navy, steel blue, tangerine standout), dark "screens" for the 3D view and floor plan. All of it is tokens in src/styles/tokens.css; src/index.css only imports src/styles/ and holds feature CSS appended below.
+- Look: dark grey theme (src/styles/skin-dark.css over the base tokens in src/styles/tokens.css; skin-glass.css is an alternative). src/index.css only imports src/styles/ and holds feature CSS appended below.
 - Font: Kazesawa, self-hosted Latin subset in public/fonts/.
 
 ## Sim rules
@@ -53,8 +54,9 @@ interface OverseerProposal { diagnosis: string; edits: BuildingEdit[]; expectedI
 - src/editor/: layout editing, no React (layout)
 - src/styles/: the design system (tokens, base, layout, panels)
 - src/ai/: Gemini calls (gemini.ts client, floorplan.ts, overseer.ts)
-- src/components/: React UI (Viewport3D, MapCanvas, Transport, Readout, LayerPanel, PeoplePanel, ScenarioPanel, ResultsPanel, OverseerPanel, ToolBar, FloorPicker, PlanPicker, EvacuationChart, Steps, Segmented, Switch, Icon, usePlayback)
+- src/components/: React UI (Viewport3D, MapCanvas, Transport, Readout, LayerPanel, PeoplePanel, ScenarioPanel, ResultsPanel, OverseerPanel, ToolBar, PlanPicker, EvacuationChart, PhoneEditor, PhoneNav, Steps, Segmented, Switch, Icon, usePlayback, usePhone)
 - public/fonts/: Kazesawa font files and licence
+- public/manifest.webmanifest, public/icons/: home-screen app (Add to Home Screen on iPhone opens it full screen)
 - public/maps/: example floor plans as Building JSON (two-rooms, office, venue), listed in src/sim/maps.ts
 - public/cache/: saved Gemini responses for offline demo
 

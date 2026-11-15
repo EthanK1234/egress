@@ -1,8 +1,5 @@
-// The layout being edited: a stack of floors, each a Building plus its fire starts.
+// The layout being edited: a Building plus its fire starts.
 // Pure functions; every edit returns a new Floor and leaves the old one untouched.
-//
-// Floors are simulated one at a time (the sim knows nothing about stairs). An exit on an
-// upper floor stands for a stairwell door: people who reach it count as having left that floor.
 
 import { CHAIR, DOOR, EMPTY, EXIT, TABLE, WALL } from "../sim/config";
 import { findExits } from "../sim/flowfield";
@@ -14,8 +11,6 @@ export interface Floor {
   building: Building;
   fireStarts: [number, number][];
 }
-
-export const MAX_FLOORS = 6;
 
 const TOOL_CELL: Record<Exclude<Tool, "fire">, number> = { wall: WALL, door: DOOR, exit: EXIT, table: TABLE, chair: CHAIR, erase: EMPTY };
 
@@ -46,12 +41,6 @@ export function toggleFireStart(floor: Floor, x: number, y: number): Floor {
     building: b,
     fireStarts: has ? floor.fireStarts.filter(([fx, fy]) => fx !== x || fy !== y) : [...floor.fireStarts, [x, y]],
   };
-}
-
-// A new floor with the same layout as `floor` and no fire.
-export function copyFloor(floor: Floor): Floor {
-  const b = floor.building;
-  return { building: { ...b, cells: b.cells.slice(), labels: b.labels.map((l) => ({ ...l })) }, fireStarts: [] };
 }
 
 // The cells on a straight line between two cells, both ends included (for painting while dragging).

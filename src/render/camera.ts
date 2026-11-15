@@ -52,10 +52,10 @@ export function viewBasis(c: Camera, aspect: number): { forward: Vec3; right: Ve
   return { forward, right, up: cross(right, forward), tanX: tan * aspect, tanY: tan };
 }
 
-// The overview: the whole floor, centred, seen from above and a little to one side.
-// `elevation` is the height of the floor being shown.
-export function fitCamera(b: Building, aspect: number, elevation: number): Camera {
-  const reach = Math.hypot(b.width, b.height) + elevation;
+// The overview: the whole building, centred, seen from above and a little to one side.
+export function fitCamera(b: Building, aspect: number): Camera {
+  const elevation = 0;
+  const reach = Math.hypot(b.width, b.height);
   const c: Camera = {
     yaw: DEFAULT_YAW,
     pitch: DEFAULT_PITCH,

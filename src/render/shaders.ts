@@ -164,8 +164,6 @@ uniform vec3 uPathColor[3];
 uniform float uPathAlpha;
 uniform vec3 uEmber;
 uniform vec3 uBackground;
-uniform vec3 uSlab;
-uniform float uPlain; // 1.0 = draw the inside of the building as a plain slab
 uniform float uGrid;
 uniform float uMargin;
 uniform vec4 uRings[5]; // x, z, radius, on
@@ -182,9 +180,7 @@ void main() {
   float coarse = max(pixel.x, pixel.y);
   vec3 color;
   bool inside = vWorld.x >= 0.0 && vWorld.y >= 0.0 && vWorld.x < uSize.x && vWorld.y < uSize.y;
-  if (inside && uPlain > 0.5) {
-    color = uSlab;
-  } else if (inside) {
+  if (inside) {
     ivec2 cell = ivec2(vWorld);
     color = texelFetch(uBase, cell, 0).rgb;
     vec4 state = texelFetch(uState, cell, 0);

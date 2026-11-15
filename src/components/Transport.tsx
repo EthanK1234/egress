@@ -30,7 +30,7 @@ export default function Transport(p: Props) {
     <div className="transport">
       {/* A mouse click doesn't move keyboard focus onto these buttons, so Space keeps meaning play/pause. */}
       <button
-        className="icon-button large"
+        className={p.ready ? "icon-button large" : "icon-button large start"}
         aria-label={playLabel}
         title={playLabel}
         disabled={p.busy}
@@ -69,6 +69,15 @@ export default function Transport(p: Props) {
       </span>
 
       <Segmented label="Playback speed" options={SPEED_OPTIONS} value={p.speed} onChange={p.onSpeed} />
+      {/* On phones the speeds don't fit side by side, so one button steps through them instead. */}
+      <button
+        className="speed-cycle"
+        aria-label={`Playback speed ${p.speed}×, tap to change`}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => p.onSpeed(SPEEDS[(SPEEDS.indexOf(p.speed) + 1) % SPEEDS.length])}
+      >
+        {p.speed}×
+      </button>
 
       <button
         className="icon-button"

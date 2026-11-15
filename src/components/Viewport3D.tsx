@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode
 import { cellsBetween, type Tool } from "../editor/layout";
 import { fitCamera, floorPoint, orbit, pan, screenRay, zoom, type Camera } from "../render/camera";
 import { project } from "../render/mat4";
-import { EXIT_POST_HEIGHT, FLOOR_SPACING, PAWN_HEIGHT, wallHeightAt } from "../render/meshes";
+import { EXIT_POST_HEIGHT, PAWN_HEIGHT, wallHeightAt } from "../render/meshes";
 import { COLOR } from "../render/palette";
 import { createRenderer, typeScale, type Renderer } from "../render/renderer";
 import { RING_RADIUS, type Layers } from "../render/view";
@@ -12,8 +12,7 @@ import type { Recording } from "../sim/recording";
 import type { Building } from "../sim/types";
 
 interface Props {
-  building: Building; // the floor being shown
-  below: Building[]; // the floors under it, lowest first
+  building: Building;
   recording: Recording | null;
   fireStarts: [number, number][];
   playhead: number;
@@ -22,11 +21,13 @@ interface Props {
   rings: { x: number; y: number }[];
   tool: Tool | null; // the layout tool in hand; null when the layout can't be edited
   follow: number | null; // id of a person to ride along with, in first person
+  resetRef?: { current: (() => void) | null }; // filled with a function that puts the camera back to the overview
+  showHelp?: boolean; // the one-line controls hint (default on)
   onPaint?: (cells: [number, number][], dragging: boolean) => void;
   children?: ReactNode; // overlaid on the view (tools, hints, progress)
 }
 
-// A text tag pinned to a point on the floor being shown.
+// A text tag pinned to a point in the scene.
 interface Label {
   key: string;
   kind: "room" | "exit" | "ring" | "tick";
@@ -36,9 +37,18 @@ interface Label {
   z: number;
 }
 
+// Two fingers on the screen: their distance apart, the point between them, and the angle between them.
+interface Gesture {
+  dist: number;
+  midX: number;
+  midY: number;
+  angle: number;
+}
+
 const ORBIT_SPEED = 0.006; // radians per pixel dragged
 const ZOOM_SPEED = 0.0012; // per wheel unit
 const CLICK_SLOP = 4; // a press that moves less than this many pixels is a click, not a drag
+const TOUCH_SLOP = 10; // a finger wobbles more than a mouse
 const TICK_EVERY = 10; // cells between the coordinate marks along the edges
 const EYE_HEIGHT = PAWN_HEIGHT * 1.15; // just above the heads, so the way ahead is visible over a crowd
 const TURN_RATE = 5; // how quickly a first-person view turns to face a new heading, per second
@@ -52,6 +62,9 @@ const TOOL_COLOR: Record<Tool, string> = {
   chair: COLOR.furnitureTop,
   erase: COLOR.trapped,
 };
+
+// True on phones and tablets: the hints talk about fingers instead of a mouse.
+const coarsePointer = () => typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
 
 function buildLabels(b: Building, showNames: boolean, rings: Props["rings"], showTicks: boolean): Label[] {
   const labels: Label[] = [];
@@ -108,7 +121,7 @@ function personPose(rec: Recording, id: number, playhead: number): { x: number; 
 // The 3D view. It only redraws when something changed (playhead, camera, layers, size),
 // so a paused or idle scene costs nothing.
 export default function Viewport3D(props: Props) {
-  const { building, below, recording, fireStarts, layers, rings, tool, follow, children } = props;
+  const { building, recording, fireStarts, layers, rings, tool, follow, resetRef, showHelp = true, children } = props;
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const labelsRef = useRef<HTMLDivElement>(null);
@@ -120,28 +133,31 @@ export default function Viewport3D(props: Props) {
   const look = useRef({ id: -1, dx: 0, dz: -1 }); // which way the first-person view faces, turned smoothly
   const raf = useRef(0);
   // The press in progress: where it started, where the pointer was last, and what it is doing.
-  const press = useRef<{ x0: number; y0: number; x: number; y: number; button: number; dragged: boolean; painting: boolean; moving: boolean } | null>(null);
+  const press = useRef<{ x0: number; y0: number; x: number; y: number; button: number; touch: boolean; dragged: boolean; painting: boolean; moving: boolean } | null>(null);
+  const touches = useRef(new Map<number, { x: number; y: number }>()); // fingers currently down
+  const gesture = useRef<Gesture | null>(null); // two-finger gesture in progress
+  const gestureUsed = useRef(false); // a two-finger gesture happened; ignore fingers until all are lifted
   const lastPainted = useRef<[number, number] | null>(null);
   const hoverRef = useRef<[number, number] | null>(null);
   const [hover, setHover] = useState<[number, number] | null>(null); // the cell under the pointer, for the readout
   const [failed, setFailed] = useState(false);
   const [canReset, setCanReset] = useState(false);
+  const [touchUi] = useState(coarsePointer);
 
-  const elevation = below.length * FLOOR_SPACING;
   const editingLayout = tool !== null && tool !== "fire";
   const labels = useMemo(() => buildLabels(building, layers.labels, rings, editingLayout), [building, layers.labels, rings, editingLayout]);
 
   // What the next draw should show. Draws happen in animation frames, after render.
-  const latest = useRef({ props, labels, elevation });
+  const latest = useRef({ props, labels });
   useEffect(() => {
-    latest.current = { props, labels, elevation };
+    latest.current = { props, labels };
   });
 
   const draw = () => {
     raf.current = 0;
     const canvas = canvasRef.current;
     if (!renderer.current || !camera.current || !canvas) return;
-    const { props: p, labels: items, elevation: lift } = latest.current;
+    const { props: p, labels: items } = latest.current;
 
     const now = performance.now();
     const dt = Math.min((now - clock.current.last) / 1000, 0.1);
@@ -161,7 +177,7 @@ export default function Viewport3D(props: Props) {
         [facing.dx, facing.dz] = len > 1e-3 ? [dx / len, dz / len] : pose.heading;
       }
       facing.id = p.follow;
-      const eye = lift + EYE_HEIGHT * typeScale(p.recording.agents[p.follow].type);
+      const eye = EYE_HEIGHT * typeScale(p.recording.agents[p.follow].type);
       view = { ...camera.current, fp: { x: pose.x, y: eye, z: pose.z, dx: facing.dx, dz: facing.dz } };
     }
 
@@ -195,11 +211,17 @@ export default function Viewport3D(props: Props) {
     if (!raf.current) raf.current = requestAnimationFrame(draw);
   };
 
-  const frameBuilding = (b: Building, lift: number) => {
+  const frameBuilding = (b: Building) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    camera.current = fitCamera(b, canvas.width / Math.max(canvas.height, 1), lift);
+    camera.current = fitCamera(b, canvas.width / Math.max(canvas.height, 1));
     fitDist.current = camera.current.dist;
+  };
+
+  const markMoved = () => {
+    moved.current = true;
+    setCanReset(true);
+    requestDraw();
   };
 
   // The cell under a point of the view. Pointing at a wall picks the wall, not the floor behind it.
@@ -207,21 +229,21 @@ export default function Viewport3D(props: Props) {
     const canvas = canvasRef.current;
     const cam = camera.current;
     if (!canvas || !cam) return null;
-    const { props: p, elevation: lift } = latest.current;
+    const { props: p } = latest.current;
     const rect = canvas.getBoundingClientRect();
     const nx = ((clientX - rect.left) / rect.width) * 2 - 1;
     const ny = 1 - ((clientY - rect.top) / rect.height) * 2;
     const { origin, dir } = screenRay(cam, rect.width / rect.height, nx, ny);
     if (dir[1] >= 0) return null;
     // Walk down the ray from the top of the tallest wall to the floor; the first wall it enters wins.
-    const t0 = (lift + EXIT_POST_HEIGHT - origin[1]) / dir[1];
-    const t1 = (lift - origin[1]) / dir[1];
+    const t0 = (EXIT_POST_HEIGHT - origin[1]) / dir[1];
+    const t1 = -origin[1] / dir[1];
     for (let i = 0; i <= PICK_STEPS; i++) {
       const t = t0 + ((t1 - t0) * i) / PICK_STEPS;
       const x = Math.floor(origin[0] + dir[0] * t);
       const y = Math.floor(origin[2] + dir[2] * t);
       if (x < 0 || y < 0 || x >= p.building.width || y >= p.building.height) continue;
-      const height = origin[1] + dir[1] * t - lift;
+      const height = origin[1] + dir[1] * t;
       if (i === PICK_STEPS || height <= wallHeightAt(p.building, x, y)) return [x, y];
     }
     return null;
@@ -266,7 +288,7 @@ export default function Viewport3D(props: Props) {
       if (canvas.width === w && canvas.height === h) return;
       canvas.width = w;
       canvas.height = h;
-      if (!moved.current) frameBuilding(latest.current.props.building, latest.current.elevation);
+      if (!moved.current) frameBuilding(latest.current.props.building);
       cancelAnimationFrame(raf.current);
       draw(); // right away: resizing clears the canvas
     });
@@ -282,24 +304,38 @@ export default function Viewport3D(props: Props) {
   }, []);
 
   useEffect(() => {
-    renderer.current?.setBuilding(building, below);
-  }, [building, below]);
+    renderer.current?.setBuilding(building);
+  }, [building]);
 
   useEffect(() => {
     renderer.current?.setRun(recording, fireStarts);
-  }, [building, below, recording, fireStarts]);
+  }, [building, recording, fireStarts]);
 
   // The plate under the pointer depends on the tool in hand and on what is built there.
   useEffect(() => {
     showCursor(tool ? hoverRef.current : null);
   }, [tool, building]);
 
-  // Frame the floor again when its size changes or another floor is shown,
-  // unless the user has set their own angle: then just move with the floor.
+  // Frame the building again when its size changes, unless the user has set their own angle.
   useEffect(() => {
-    if (moved.current && camera.current) camera.current.ty = elevation;
-    else frameBuilding(latest.current.props.building, elevation);
-  }, [building.width, building.height, elevation]);
+    if (!moved.current) frameBuilding(latest.current.props.building);
+  }, [building.width, building.height]);
+
+  const resetView = () => {
+    moved.current = false;
+    setCanReset(false);
+    frameBuilding(latest.current.props.building);
+    requestDraw();
+  };
+
+  // The parent can ask for the overview (the phone editor's reset button).
+  useEffect(() => {
+    if (!resetRef) return;
+    resetRef.current = resetView;
+    return () => {
+      resetRef.current = null;
+    };
+  });
 
   // Any other change (playhead, layers, markers) just needs a redraw.
   useEffect(requestDraw);
@@ -312,6 +348,16 @@ export default function Viewport3D(props: Props) {
     return floorPoint(camera.current, r.width / r.height, ((clientX - r.left) / r.width) * 2 - 1, 1 - ((clientY - r.top) / r.height) * 2);
   };
 
+  // Slides the view so the floor point under (fromX, fromY) ends up under (toX, toY).
+  const slide = (fromX: number, fromY: number, toX: number, toY: number) => {
+    const from = floorAt(fromX, fromY);
+    const to = floorAt(toX, toY);
+    if (!from || !to || !camera.current) return;
+    const b = latest.current.props.building;
+    const m = Math.max(b.width, b.height) * 0.5;
+    pan(camera.current, from[0] - to[0], from[2] - to[2], [-m, -m, b.width + m, b.height + m]);
+  };
+
   // Zoom towards whatever is under the pointer. A native listener, because React's wheel events
   // can't stop the page from scrolling.
   useEffect(() => {
@@ -321,37 +367,77 @@ export default function Viewport3D(props: Props) {
       if (!camera.current || latest.current.props.follow !== null) return;
       e.preventDefault();
       zoom(camera.current, Math.exp(e.deltaY * ZOOM_SPEED), fitDist.current, floorAt(e.clientX, e.clientY));
-      moved.current = true;
-      setCanReset(true);
-      requestDraw();
+      markMoved();
     };
     canvas.addEventListener("wheel", onWheel, { passive: false });
     return () => canvas.removeEventListener("wheel", onWheel);
   }, []);
 
+  const readGesture = (): Gesture | null => {
+    const pts = [...touches.current.values()];
+    if (pts.length < 2) return null;
+    const [a, b] = pts;
+    return { dist: Math.hypot(b.x - a.x, b.y - a.y), midX: (a.x + b.x) / 2, midY: (a.y + b.y) / 2, angle: Math.atan2(b.y - a.y, b.x - a.x) };
+  };
+
   // What a drag does:
-  // - left: orbit (or paint, with a building tool in hand); a plain click with the fire tool places a fire
-  // - right: move the view (or orbit, with a building tool in hand; Shift+right moves)
-  // - middle, or Shift with the left button: always moves the view
+  // - mouse left / one finger: orbit (or paint, with a building tool in hand); a tap with the fire tool places a fire
+  // - mouse right: move the view (or orbit, with a building tool in hand; Shift+right moves)
+  // - mouse middle, or Shift with the left button: always moves the view
+  // - two fingers: pinch to zoom on the point between them, slide to move, twist to turn
   const onPointerDown = (e: PointerEvent<HTMLCanvasElement>) => {
     if (follow !== null) return; // in first person the camera rides with the person
     e.currentTarget.setPointerCapture(e.pointerId);
+    const touch = e.pointerType === "touch";
+    if (touch) {
+      touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touches.current.size >= 2) {
+        // A second finger turns whatever the first was doing into a two-finger gesture.
+        press.current = null;
+        lastPainted.current = null;
+        gesture.current = readGesture();
+        gestureUsed.current = true;
+        setHoverCell(null);
+        return;
+      }
+      if (gestureUsed.current) return;
+    }
     const painting = e.button === 0 && editingLayout && !e.shiftKey;
-    const moving = e.button === 1 || (e.button === 0 && e.shiftKey) || (e.button === 2 && (!editingLayout || e.shiftKey));
-    press.current = { x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, button: e.button, dragged: false, painting, moving };
+    const moving = !touch && (e.button === 1 || (e.button === 0 && e.shiftKey) || (e.button === 2 && (!editingLayout || e.shiftKey)));
+    press.current = { x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, button: e.button, touch, dragged: false, painting, moving };
     if (painting) {
       const cell = pick(e.clientX, e.clientY);
       lastPainted.current = cell;
+      if (touch) setHoverCell(cell);
       if (cell) props.onPaint?.([cell], false);
     }
   };
 
   const onPointerMove = (e: PointerEvent<HTMLCanvasElement>) => {
-    const cell = tool !== null && follow === null ? pick(e.clientX, e.clientY) : null;
-    setHoverCell(cell);
+    const touch = e.pointerType === "touch";
+    if (touch && touches.current.has(e.pointerId)) touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    // Two fingers: zoom, slide and turn together.
+    if (touch && touches.current.size >= 2 && gesture.current && camera.current) {
+      const now = readGesture();
+      if (!now) return;
+      const before = gesture.current;
+      if (before.dist > 0 && now.dist > 0) zoom(camera.current, before.dist / now.dist, fitDist.current, floorAt(now.midX, now.midY));
+      slide(before.midX, before.midY, now.midX, now.midY);
+      let turn = now.angle - before.angle;
+      if (turn > Math.PI) turn -= Math.PI * 2;
+      if (turn < -Math.PI) turn += Math.PI * 2;
+      orbit(camera.current, -turn, 0);
+      gesture.current = now;
+      markMoved();
+      return;
+    }
+
+    const cell = tool !== null && follow === null && (!touch || press.current?.painting) ? pick(e.clientX, e.clientY) : null;
+    if (!touch || press.current?.painting) setHoverCell(cell);
     const p = press.current;
     if (!p) return;
-    if (Math.hypot(e.clientX - p.x0, e.clientY - p.y0) > CLICK_SLOP) p.dragged = true;
+    if (Math.hypot(e.clientX - p.x0, e.clientY - p.y0) > (p.touch ? TOUCH_SLOP : CLICK_SLOP)) p.dragged = true;
     if (p.painting) {
       const from = lastPainted.current;
       if (cell && (!from || from[0] !== cell[0] || from[1] !== cell[1])) {
@@ -359,48 +445,40 @@ export default function Viewport3D(props: Props) {
         lastPainted.current = cell;
       }
     } else if (camera.current && p.moving) {
-      // Slide the view so the floor under the pointer follows it, like dragging a map.
-      const from = floorAt(p.x, p.y);
-      const to = floorAt(e.clientX, e.clientY);
-      if (from && to) {
-        const b = latest.current.props.building;
-        const m = Math.max(b.width, b.height) * 0.5;
-        pan(camera.current, from[0] - to[0], from[2] - to[2], [-m, -m, b.width + m, b.height + m]);
-      }
-      moved.current = true;
-      setCanReset(true);
-      requestDraw();
-    } else if (camera.current) {
+      slide(p.x, p.y, e.clientX, e.clientY);
+      markMoved();
+    } else if (camera.current && (!p.touch || p.dragged)) {
       orbit(camera.current, -(e.clientX - p.x) * ORBIT_SPEED, (e.clientY - p.y) * ORBIT_SPEED);
-      moved.current = true;
-      setCanReset(true);
-      requestDraw();
+      markMoved();
     }
     p.x = e.clientX;
     p.y = e.clientY;
   };
 
-  const onPointerUp = (e: PointerEvent<HTMLCanvasElement>) => {
+  const endPointer = (e: PointerEvent<HTMLCanvasElement>, cancelled: boolean) => {
+    if (e.pointerType === "touch") {
+      touches.current.delete(e.pointerId);
+      if (touches.current.size < 2) gesture.current = null;
+      if (touches.current.size === 0) gestureUsed.current = false;
+    }
     const p = press.current;
     press.current = null;
     lastPainted.current = null;
-    if (p && !p.dragged && p.button === 0 && tool === "fire") {
+    if (!cancelled && p && !p.dragged && p.button === 0 && tool === "fire") {
       const cell = pick(e.clientX, e.clientY);
       if (cell) props.onPaint?.([cell], false);
     }
   };
 
-  const cancelPress = () => {
-    press.current = null;
-    lastPainted.current = null;
-  };
-
-  const resetView = () => {
-    moved.current = false;
-    setCanReset(false);
-    frameBuilding(building, elevation);
-    requestDraw();
-  };
+  const help = touchUi
+    ? editingLayout
+      ? "Drag to paint · two fingers to move, zoom and turn"
+      : tool === "fire"
+        ? "Tap to place fire · drag to orbit · pinch to zoom"
+        : "Drag to orbit · pinch to zoom · two fingers to move"
+    : editingLayout
+      ? "Left-drag to paint · right-drag to orbit · Shift+right-drag to move · scroll to zoom"
+      : "Drag to orbit · right-drag to move · scroll to zoom";
 
   return (
     <div className="viewport" ref={wrapRef}>
@@ -410,9 +488,9 @@ export default function Viewport3D(props: Props) {
         aria-label="3D view of the building"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={cancelPress}
-        onPointerLeave={() => setHoverCell(null)}
+        onPointerUp={(e) => endPointer(e, false)}
+        onPointerCancel={(e) => endPointer(e, true)}
+        onPointerLeave={(e) => e.pointerType !== "touch" && setHoverCell(null)}
         onContextMenu={(e) => e.preventDefault()}
         onDoubleClick={tool === null && follow === null ? resetView : undefined}
       />
@@ -425,19 +503,13 @@ export default function Viewport3D(props: Props) {
       </div>
       {tool !== null && hover && (
         <div className="coords num">
-          x {hover[0]} · y {hover[1]} · floor {below.length + 1}
+          x {hover[0]} · y {hover[1]}
           <span>
             {(hover[0] * CELL_M).toFixed(1)} m, {(hover[1] * CELL_M).toFixed(1)} m
           </span>
         </div>
       )}
-      {follow === null && !(tool !== null && hover) && (
-        <p className="viewport-help">
-          {editingLayout
-            ? "Left-drag to paint · right-drag to orbit · Shift+right-drag to move · scroll to zoom"
-            : "Drag to orbit · right-drag to move · scroll to zoom"}
-        </p>
-      )}
+      {showHelp && follow === null && !(tool !== null && hover) && <p className="viewport-help">{help}</p>}
       {canReset && follow === null && (
         <button className="glass viewport-reset" onMouseDown={(e) => e.preventDefault()} onClick={resetView}>
           Reset view

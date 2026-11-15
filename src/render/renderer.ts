@@ -2,7 +2,7 @@
 //
 // Kept light on the GPU on purpose:
 // - floor, paths, grid, burnt cells and bottleneck rings are one quad, shaded from tiny per-cell textures
-// - walls and furniture are one static mesh with hidden faces removed; the floors underneath are a second one
+// - walls and furniture are one static mesh with hidden faces removed
 // - people and flames are instanced (one draw call each)
 // - flames and textures are uploaded once per run; the shaders animate them from the playhead
 // - the only per-frame upload is the people buffer (7 floats per person)
@@ -12,8 +12,8 @@ import { DOOR, EXIT } from "../sim/config";
 import { EVACUATED, FROZEN, TRAPPED, type Recording } from "../sim/recording";
 import type { Behavior, Building } from "../sim/types";
 import { viewBasis, viewProjection, type Camera } from "./camera";
-import { translated, type Mat4 } from "./mat4";
-import { FLOOR_SPACING, cursorPlate, flameMesh, groundMargin, groundQuads, pawnMesh, pushFurniture, pushWalls, topAt } from "./meshes";
+import type { Mat4 } from "./mat4";
+import { cursorPlate, flameMesh, groundMargin, groundQuads, pawnMesh, pushFurniture, pushWalls, topAt } from "./meshes";
 import { BEHAVIORS, BEHAVIOR_COLOR, COLOR, rgb, rgb255, type RGB } from "./palette";
 import { PATH_ALPHA, pathLayers } from "./paths";
 import { AGENT_VS, FLAME_VS, FLAT_FS, FLOOR_FS, FLOOR_VS, SKY_FS, SKY_VS, WALL_VS } from "./shaders";
@@ -29,13 +29,13 @@ export interface Frame3D {
 }
 
 export interface Renderer {
-  // The floor to show, standing on the floors under it (lowest first).
-  setBuilding(b: Building, below: Building[]): void;
+  // The building to show.
+  setBuilding(b: Building): void;
   // With a recording, shows that run. Without one, shows the fire starts as steady flames.
   setRun(rec: Recording | null, fireStarts: [number, number][]): void;
   // The layout editor's cursor: a colored plate on one cell, or null for none.
   setCursor(cell: { x: number; y: number } | null, color: string): void;
-  // Draws one frame and returns the matrix that maps the shown floor to the screen.
+  // Draws one frame and returns the matrix that maps the scene to the screen.
   draw(f: Frame3D): Mat4;
   dispose(): void;
 }
@@ -83,7 +83,6 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
     frame: uniform(floorProg, "uFrame"),
     pathOn: uniform(floorProg, "uPathOn"),
     grid: uniform(floorProg, "uGrid"),
-    plain: uniform(floorProg, "uPlain"),
     margin: uniform(floorProg, "uMargin"),
     rings: uniform(floorProg, "uRings"),
   };
@@ -104,7 +103,6 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
   gl.uniform1f(uniform(floorProg, "uPathAlpha"), PATH_ALPHA);
   gl.uniform3fv(uniform(floorProg, "uEmber"), rgb(COLOR.ember));
   gl.uniform3fv(uniform(floorProg, "uBackground"), rgb(COLOR.background));
-  gl.uniform3fv(uniform(floorProg, "uSlab"), rgb(COLOR.slab));
   gl.useProgram(flameProg);
   gl.uniform3fv(uniform(flameProg, "uFireBase"), rgb(COLOR.fire));
   gl.uniform3fv(uniform(flameProg, "uFireTip"), rgb(COLOR.fireTip));
@@ -112,7 +110,6 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
   // Buffers and vertex layouts
   const groundBuf = gl.createBuffer();
   const wallBuf = gl.createBuffer();
-  const lowerBuf = gl.createBuffer();
   const cursorBuf = gl.createBuffer();
   const pawnBuf = gl.createBuffer();
   const flameBuf = gl.createBuffer();
@@ -138,7 +135,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
   gl.bindBuffer(gl.ARRAY_BUFFER, groundBuf);
   attrib(0, 2, 2, 0);
 
-  // Walls, the storeys underneath and the editor cursor share one layout.
+  // Walls and the editor cursor share one layout.
   const wallLayout = (buffer: WebGLBuffer) => {
     const vao = gl.createVertexArray();
     gl.bindVertexArray(vao);
@@ -149,7 +146,6 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
     return vao;
   };
   const wallVao = wallLayout(wallBuf);
-  const lowerVao = wallLayout(lowerBuf);
   const cursorVao = wallLayout(cursorBuf);
 
   const agentVao = gl.createVertexArray();
@@ -191,9 +187,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
 
   let building: Building | null = null;
   let rec: Recording | null = null;
-  let elevation = 0; // height of the floor being shown
   let wallVertices = 0;
-  let lowerVertices = 0;
   let cursorVertices = 0;
   let flameCount = 0;
   let agentData = new Float32Array(0);
@@ -203,25 +197,17 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
   const frozenRgb = rgb(COLOR.frozen);
   const trappedRgb = rgb(COLOR.trapped);
 
-  function setBuilding(b: Building, below: Building[]): void {
+  function setBuilding(b: Building): void {
     building = b;
-    elevation = below.length * FLOOR_SPACING;
     gl.bindBuffer(gl.ARRAY_BUFFER, groundBuf);
     gl.bufferData(gl.ARRAY_BUFFER, groundQuads(b), gl.STATIC_DRAW);
 
-    // The shown floor's walls are built at height 0 and lifted when drawn.
     const walls: number[] = [];
-    pushWalls(walls, b, 0, false);
+    pushWalls(walls, b);
     pushFurniture(walls, b, 0);
     wallVertices = walls.length / WALL_FLOATS;
     gl.bindBuffer(gl.ARRAY_BUFFER, wallBuf);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(walls), gl.STATIC_DRAW);
-
-    const storeys: number[] = [];
-    below.forEach((floor, i) => pushWalls(storeys, floor, i * FLOOR_SPACING, true));
-    lowerVertices = storeys.length / WALL_FLOATS;
-    gl.bindBuffer(gl.ARRAY_BUFFER, lowerBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(storeys), gl.STATIC_DRAW);
 
     const colors = [COLOR.floor, COLOR.floor, COLOR.door, COLOR.exit].map(rgb255); // walls sit on plain floor
     const base = new Uint8Array(b.cells.length * 4);
@@ -344,9 +330,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.enable(gl.DEPTH_TEST);
 
-    // Everything on the shown floor is drawn `elevation` above the ground.
-    const lifted = elevation > 0 ? translated(viewProj, 0, elevation, 0) : viewProj;
-    if (!building) return lifted;
+    if (!building) return viewProj;
     const frame = rec ? f.playhead : SETUP_FRAME;
 
     rings.fill(0);
@@ -357,28 +341,15 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
     gl.uniform1f(floorU.grid, +f.layers.grid);
     gl.uniform4fv(floorU.rings, rings);
     gl.bindVertexArray(floorVao);
-    // The ground. If the shown floor is upstairs, the ground inside the building is a plain slab
-    // and the floor itself is drawn again, lifted, on top of the storeys.
     gl.uniformMatrix4fv(floorU.viewProj, false, viewProj);
-    gl.uniform1f(floorU.plain, elevation > 0 ? 1 : 0);
     // The grid outside the building is see-through over the sky, so the ground is blended.
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     gl.disable(gl.BLEND);
-    if (elevation > 0) {
-      gl.uniformMatrix4fv(floorU.viewProj, false, lifted);
-      gl.uniform1f(floorU.plain, 0);
-      gl.drawArrays(gl.TRIANGLES, 6, 6);
-    }
 
     gl.useProgram(wallProg);
-    if (lowerVertices) {
-      gl.uniformMatrix4fv(wallViewProj, false, viewProj);
-      gl.bindVertexArray(lowerVao);
-      gl.drawArrays(gl.TRIANGLES, 0, lowerVertices);
-    }
-    gl.uniformMatrix4fv(wallViewProj, false, lifted);
+    gl.uniformMatrix4fv(wallViewProj, false, viewProj);
     gl.bindVertexArray(wallVao);
     gl.drawArrays(gl.TRIANGLES, 0, wallVertices);
     if (cursorVertices) {
@@ -391,27 +362,27 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
       gl.bindBuffer(gl.ARRAY_BUFFER, agentInstBuf);
       gl.bufferSubData(gl.ARRAY_BUFFER, 0, agentData);
       gl.useProgram(agentProg);
-      gl.uniformMatrix4fv(agentViewProj, false, lifted);
+      gl.uniformMatrix4fv(agentViewProj, false, viewProj);
       gl.bindVertexArray(agentVao);
       gl.drawArraysInstanced(gl.TRIANGLES, 0, pawn.length / 6, rec.agents.length);
     }
 
     if (flameCount) {
       gl.useProgram(flameProg);
-      gl.uniformMatrix4fv(flameU.viewProj, false, lifted);
+      gl.uniformMatrix4fv(flameU.viewProj, false, viewProj);
       gl.uniform1f(flameU.frame, frame);
       gl.uniform1f(flameU.clock, f.clock);
       gl.bindVertexArray(flameVao);
       gl.drawArraysInstanced(gl.TRIANGLES, 0, flame.length / 6, flameCount);
     }
     gl.bindVertexArray(null);
-    return lifted;
+    return viewProj;
   }
 
   function dispose(): void {
     for (const p of [skyProg, floorProg, wallProg, agentProg, flameProg]) gl.deleteProgram(p);
-    for (const b of [groundBuf, wallBuf, lowerBuf, cursorBuf, pawnBuf, flameBuf, agentInstBuf, flameInstBuf]) gl.deleteBuffer(b);
-    for (const v of [skyVao, floorVao, wallVao, lowerVao, cursorVao, agentVao, flameVao]) gl.deleteVertexArray(v);
+    for (const b of [groundBuf, wallBuf, cursorBuf, pawnBuf, flameBuf, agentInstBuf, flameInstBuf]) gl.deleteBuffer(b);
+    for (const v of [skyVao, floorVao, wallVao, cursorVao, agentVao, flameVao]) gl.deleteVertexArray(v);
     for (const t of [baseTex, stateTex, trafficTex]) gl.deleteTexture(t);
   }
 

@@ -8,6 +8,8 @@
 @import "./styles/panels.css";
 /* The skin on top: skin-dark.css (dark grey), skin-glass.css (frosted glass), or neither (plain white). */
 @import "./styles/skin-dark.css";
+/* Touch screens and the phone layout, on top of the skin. */
+@import "./styles/phone.css";
 
 /* Overseer */
 

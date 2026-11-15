@@ -1,0 +1,585 @@
+/* Touch screens and the phone layout (App renders .phone on screens up to 700px wide).
+
+   Two modes:
+   - view: header, the 3D view and playback stay still at the top; only the section's content
+     below them scrolls; a floating tab bar sits over the bottom
+   - edit: the 3D view fills the screen with a slim top bar and a tray of tools (.phone.editing)
+
+   The page itself never scrolls, so nothing ever passes under the iPhone's status bar, and the
+   status bar area is the same dark grey as the header: one seamless surface to the top edge. */
+
+/* ---- Every touch screen ---- */
+
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden; /* never scroll sideways */
+}
+
+/* The color behind the status bar and anywhere the page shows through: the same as the header. */
+html {
+  background-color: var(--bg);
+}
+
+@media (pointer: coarse) {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  /* No highlighting text by holding a finger on it, no grey flash on tap, no callout menu. */
+  body {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  input,
+  select,
+  textarea {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  /* Taps are taps: no double-tap zoom anywhere (the 3D view handles its own gestures). */
+  * {
+    touch-action: manipulation;
+  }
+
+  .viewport canvas {
+    touch-action: none;
+  }
+}
+
+/* ---- The phone layout ---- */
+
+.phone {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: var(--bg);
+}
+
+/* The status bar strip: the page's dark grey, a little see-through and blurred, so the header and
+   content slide smoothly underneath the time and battery as you scroll, like a native app. */
+.phone::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 20;
+  height: env(safe-area-inset-top);
+  background: rgba(30, 30, 30, 0.82);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  pointer-events: none;
+}
+
+.phone.editing::before {
+  display: none;
+}
+
+.phone > * {
+  flex: none;
+}
+
+/* iOS zooms into any field with text under 16px when it is tapped. */
+.phone input,
+.phone select {
+  font-size: 16px;
+}
+
+/* Header: a round logo, the name and step, and round actions on the right. */
+.p-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 4px 0;
+}
+
+.p-logo {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  color: #1e1e1e;
+  background: var(--text);
+  border-radius: 10px;
+}
+
+.p-title {
+  display: grid;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.p-title b {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.p-title small {
+  overflow: hidden;
+  font-size: 11.5px;
+  color: var(--text-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.p-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.p-round,
+.p-actions .file-button {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--control);
+}
+
+/* The 3D view, only on the Simulate tab. Other tabs hide it (it stays loaded, so the camera
+   and the run carry on where they were) and give the whole screen to their content. */
+.p-stage.off {
+  display: none;
+}
+
+/* The 3D view: a box that scrolls with the rest of the page. */
+.p-stage {
+  position: relative;
+  height: 40dvh;
+  min-height: 260px;
+}
+
+.p-stage .viewport {
+  height: 100%;
+  border-radius: 22px;
+}
+
+.p-transport {
+  margin-top: -4px;
+}
+
+/* Playback on one row: play, the timeline, the time, speed (one button) and skip. */
+.phone .transport {
+  gap: 10px;
+  padding: 0;
+}
+
+.phone .transport .icon-button.large {
+  width: 46px;
+  height: 46px;
+}
+
+.phone .transport .timeline {
+  flex: 1 1 0;
+  min-width: 60px;
+}
+
+.phone .transport-time {
+  min-width: 0;
+}
+
+.phone .transport .segmented {
+  display: none;
+}
+
+.phone .speed-cycle {
+  display: block;
+  flex: none;
+  width: 46px;
+  height: 40px;
+  padding: 0;
+  font-size: 14px;
+  border-radius: 20px;
+}
+
+/* The only part that scrolls. Its bounce stays inside it, so the top never moves. */
+.phone > .p-content {
+  flex: 1 1 0;
+  display: grid;
+  grid-auto-rows: max-content; /* every card at its full height; the area scrolls instead of squeezing them */
+  align-content: start;
+  gap: 14px;
+  min-height: 0;
+  padding: calc(env(safe-area-inset-top) + 10px) 12px calc(112px + env(safe-area-inset-bottom));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Before a run, the play button is the main action: white, like the Run button. */
+.phone .transport .icon-button.large.start,
+.phone .transport .icon-button.large.start:hover:not(:disabled) {
+  color: #1e1e1e;
+  background: #e6e6e6;
+}
+
+.phone .transport .icon-button.large.start:active:not(:disabled) {
+  background: #c8c8c8;
+}
+
+.phone .card {
+  border-radius: 20px;
+}
+
+/* The numbers: the two key ones side by side, the others under them. */
+.phone .readout {
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  min-height: auto;
+  padding: 12px;
+}
+
+.phone .stat.hero .stat-value {
+  font-size: 30px;
+}
+
+.phone .stat-value {
+  font-size: 20px;
+}
+
+.phone .stat.hero {
+  padding: 8px 10px 8px 20px;
+}
+
+.phone .stat.hero::before {
+  left: 9px;
+}
+
+/* A big, friendly way into the editor. */
+.p-edit-cta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: auto;
+  padding: 14px 16px;
+  text-align: left;
+  background: var(--surface);
+  border-radius: 20px;
+  box-shadow: var(--raised);
+}
+
+.p-edit-cta b {
+  display: block;
+  font-size: 16px;
+}
+
+.p-edit-cta small {
+  display: block;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-3);
+}
+
+.p-edit-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  color: #1e1e1e;
+  background: var(--text);
+  border-radius: 50%;
+}
+
+.phone .people {
+  min-height: 0;
+}
+
+.phone .people-list {
+  height: 40dvh;
+}
+
+.phone .bar-row {
+  grid-template-columns: 84px minmax(0, 1fr) 32px;
+}
+
+/* Floating tab bar with a round action in the middle. */
+.phone-nav {
+  position: fixed;
+  right: 12px;
+  bottom: calc(10px + env(safe-area-inset-bottom));
+  left: 12px;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-items: center;
+  height: 66px;
+  padding: 0 6px;
+  background: rgba(36, 36, 36, 0.94);
+  border-radius: 33px;
+  box-shadow: 0 0 0 1px #111111, inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 12px 30px rgba(0, 0, 0, 0.55);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+.phone-nav .pn-item,
+.phone-nav .pn-item:hover:not(:disabled),
+.phone-nav .pn-item:active:not(:disabled) {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  height: 58px;
+  padding: 8px 0 0;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text-3);
+  background: none;
+  box-shadow: none;
+}
+
+.phone-nav .pn-item.on {
+  color: var(--text);
+}
+
+.phone-nav .pn-center,
+.phone-nav .pn-center:hover:not(:disabled) {
+  display: grid;
+  justify-self: center;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  padding: 0;
+  color: #1e1e1e;
+  background: #e6e6e6;
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px rgba(36, 36, 36, 0.94), 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+
+.phone-nav .pn-center:active:not(:disabled) {
+  background: #c8c8c8;
+}
+
+/* ---- The full-screen editor ---- */
+
+.phone.editing {
+  overflow: hidden;
+  padding-top: 0;
+}
+
+.phone.editing .p-content {
+  overflow: hidden;
+}
+
+.phone.editing .p-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+}
+
+.phone.editing .p-stage .viewport {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.phone .viewport-reset {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 20px;
+}
+
+.phone.editing .viewport-reset {
+  display: none; /* the top bar has its own */
+}
+
+.phone .viewport-help,
+.phone .coords {
+  top: calc(env(safe-area-inset-top) + 82px);
+  right: auto;
+  bottom: auto;
+  left: 50%;
+  translate: -50% 0;
+  white-space: nowrap;
+}
+
+.phone .coords {
+  padding: 5px 10px;
+}
+
+.pe-top {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 10px);
+  right: 12px;
+  left: 12px;
+  z-index: 3;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pe-side {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+}
+
+.pe-round,
+.pe-round:hover:not(:disabled) {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  color: var(--screen-text);
+  background: rgba(40, 40, 40, 0.92);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.pe-caption {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--screen-text-2);
+}
+
+.pe-title {
+  min-width: 0;
+  margin-top: 2px;
+}
+
+.pe-title select {
+  max-width: 100%;
+  height: 44px;
+  padding: 0 36px 0 18px;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--screen-text);
+  background: rgba(40, 40, 40, 0.92)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d0d0d0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")
+    no-repeat right 12px center / 16px;
+  border: 0;
+  border-radius: 22px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+  color-scheme: dark;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.pe-title option {
+  color: var(--text);
+  background: #2b2b2b;
+}
+
+.pe-fires,
+.pe-fires:hover:not(:disabled) {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom) + 112px);
+  left: 50%;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
+  color: var(--screen-text);
+  background: rgba(30, 30, 30, 0.92);
+  border-radius: 18px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+  translate: -50% 0;
+}
+
+.pe-fires .dot {
+  background: #d03b3b;
+}
+
+.pe-fires span {
+  color: var(--screen-text-2);
+  text-decoration: underline;
+}
+
+.pe-tray {
+  position: absolute;
+  right: 10px;
+  bottom: calc(env(safe-area-inset-bottom) + 12px);
+  left: 10px;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+  padding: 8px 4px;
+  background: rgba(30, 30, 30, 0.94);
+  border-radius: 24px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 10px 30px rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+.pe-tool,
+.pe-tool:hover:not(:disabled),
+.pe-tool:active:not(:disabled) {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  height: auto;
+  min-width: 0;
+  padding: 2px 0;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--screen-text-2);
+  background: none;
+  box-shadow: none;
+}
+
+.pe-tool-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 13px;
+}
+
+.pe-tool.on {
+  color: var(--screen-text);
+}
+
+.pe-tool.on .pe-tool-icon {
+  color: #1e1e1e;
+  background: #e6e6e6;
+}
+
+/* ---- Phones turned sideways: the layout stays upright ---- */
+
+.rotate-hint {
+  display: none;
+}
+
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
+  .rotate-hint {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 14px;
+    font-size: 17px;
+    font-weight: 500;
+    color: var(--text);
+    background: var(--bg);
+  }
+
+  .rotate-hint svg {
+    rotate: 90deg;
+  }
+}

@@ -29,10 +29,8 @@ export const COLOR = {
   chair: "#a8947c", // 2D map
   furnitureTop: "#9a846b", // 3D view: tables and chairs
   furnitureSide: "#5f5040",
-  storey: "#2b333f", // walls of the floors under the one being shown
   sky: "#16202d", // overhead
   skyHorizon: "#2d3d54", // a soft glow at the horizon; below it the sky fades back down to `background`
-  slab: "#0f141a", // ground level inside the building, when the floor shown is above it
   exit: "#12a150",
   fire: "#d03b3b",
   fireTip: "#f39a3d",

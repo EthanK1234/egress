@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react";
 import LayerPanel from "./components/LayerPanel";
 import MapCanvas from "./components/MapCanvas";
 import OverseerPanel from "./components/OverseerPanel";
@@ -8,15 +8,17 @@ import ScenarioPanel from "./components/ScenarioPanel";
 import Transport from "./components/Transport";
 import { usePlayback } from "./components/usePlayback";
 import Viewport3D from "./components/Viewport3D";
-import FloorPicker from "./components/FloorPicker";
 import Icon from "./components/Icon";
 import PlanPicker from "./components/PlanPicker";
 import EvacuationChart from "./components/EvacuationChart";
 import PeoplePanel from "./components/PeoplePanel";
+import PhoneEditor from "./components/PhoneEditor";
+import PhoneNav, { type PhoneTab } from "./components/PhoneNav";
 import Segmented from "./components/Segmented";
 import Steps, { type Step } from "./components/Steps";
 import ToolBar from "./components/ToolBar";
-import { MAX_FLOORS, copyFloor, paintCell, toggleFireStart, type Floor, type Tool } from "./editor/layout";
+import { usePhone } from "./components/usePhone";
+import { paintCell, toggleFireStart, type Floor, type Tool } from "./editor/layout";
 import { BEHAVIOR_NAME } from "./render/palette";
 import { EVACUATED } from "./sim/recording";
 import { DEFAULT_LAYERS, type Layers } from "./render/view";
@@ -30,7 +32,7 @@ import type { Behavior, Building, OverseerProposal } from "./sim/types";
 
 const NO_RINGS: { x: number; y: number }[] = [];
 
-// Fire starts saved alongside a floor by Export. Anything malformed is ignored.
+// Fire starts saved alongside a floor plan by Export. Anything malformed is ignored.
 function readFireStarts(raw: unknown): [number, number][] {
   const list = (raw as { fireStarts?: unknown })?.fireStarts;
   if (!Array.isArray(list)) return [];
@@ -40,18 +42,20 @@ const SLICE_MS = 12; // time spent computing the run per animation frame, so the
 // testMap is the same plan as the first entry in MAPS, so the app has a building before any file loads.
 const DEFAULT_FLOOR: Floor = { building: testMap, fireStarts: [] };
 
+const STEP_NAME: Record<Step, string> = { setup: "Set up", simulate: "Simulate", diagnose: "Diagnose", prove: "Prove" };
+const STEP_NUMBER: Record<Step, number> = { setup: 1, simulate: 2, diagnose: 3, prove: 4 };
+
 type Tab = "results" | "people";
 
 export default function App() {
-  const [floors, setFloors] = useState<Floor[]>([DEFAULT_FLOOR]);
-  const [level, setLevel] = useState(0); // index of the floor being worked on; 0 is the ground floor
+  const [floor, setFloor] = useState<Floor>(DEFAULT_FLOOR); // the layout as edited, and its fire starts
   const [tool, setTool] = useState<Tool>("fire");
   const [tabChoice, setTabChoice] = useState<{ tab: Tab; run: Recording } | null>(null);
   const [selectedIn, setSelectedIn] = useState<Recording | null>(null); // the run the selected person belongs to
-  const floorsRef = useRef(floors); // the latest floors even between renders: dragging a tool sends several edits per frame
-  // The floor being worked on, as laid out in the editor: the picked floor plan plus any edits.
-  const original = floors[level].building;
-  const fireStarts = floors[level].fireStarts;
+  const floorRef = useRef(floor); // the latest layout even between renders: dragging a tool sends several edits per frame
+  // The building being worked on, as laid out in the editor: the picked floor plan plus any edits.
+  const original = floor.building;
+  const fireStarts = floor.fireStarts;
   const [seed, setSeed] = useState(DEFAULT_SEED);
   const [agentCount, setAgentCount] = useState(DEFAULT_AGENT_COUNT);
   const [layerState, setLayerState] = useState<Layers>(DEFAULT_LAYERS);
@@ -73,6 +77,13 @@ export default function App() {
   const recorder = useRef<Recorder | null>(null);
   const sideScroll = useRef<HTMLDivElement>(null); // the part of the side column under the floor plan and tabs
   const playback = usePlayback(recording?.frames ?? 0);
+
+  // Phone layout
+  const phone = usePhone();
+  const [phoneEdit, setPhoneEdit] = useState(false); // the full-screen editor is open
+  const [phoneTab, setPhoneTab] = useState<PhoneTab>("sim");
+  const resetCamera = useRef<(() => void) | null>(null);
+  const phoneScroll = useRef<HTMLDivElement>(null);
 
   // The selected person belongs to one run, so a new run starts with nobody selected.
   const layers = useMemo(
@@ -110,12 +121,25 @@ export default function App() {
     return () => cancelAnimationFrame(raf);
   }, [computing]);
 
+  // On touch screens, the page itself never zooms: pinches belong to the 3D view (Safari ignores the
+  // viewport tag's no-zoom setting, so its gesture events are stopped here).
+  useEffect(() => {
+    const stop = (e: Event) => e.preventDefault();
+    document.addEventListener("gesturestart", stop, { passive: false });
+    document.addEventListener("gesturechange", stop, { passive: false });
+    return () => {
+      document.removeEventListener("gesturestart", stop);
+      document.removeEventListener("gesturechange", stop);
+    };
+  }, []);
+
   const run = () => {
     if (recording || computing) return;
     mapLoadId.current++; // a floor plan still loading must not replace the building mid-run
     recorder.current = startRecording(building, { seed, agentCount, fireStarts, blockedExits: [] });
     setSimulatedSec(0);
     setComputing(true);
+    setPhoneEdit(false);
   };
 
   const reset = () => {
@@ -193,6 +217,21 @@ export default function App() {
     setComputing(true);
   };
 
+  // Replaces the layout, and keeps the building the sim runs on in step with it.
+  const changeFloor = (next: Floor) => {
+    floorRef.current = next;
+    setFloor(next);
+    setBuilding(next.building);
+  };
+
+  // Switches to a picked or imported floor plan.
+  const showMap = (loaded: Building, id: string, fileName: string | null, fires: [number, number][] = []) => {
+    setMapId(id);
+    setImportedName(fileName);
+    setPlan(loaded);
+    changeFloor({ building: loaded, fireStarts: fires });
+  };
+
   // Switches floor plan. Only offered before a run, so there is no run or proposal to clear.
   const pickMap = async (id: string) => {
     const map = MAPS.find((m) => m.id === id);
@@ -211,25 +250,17 @@ export default function App() {
     }
   };
 
-  // Loads a floor plan from a JSON file the user picked.
+  // Loads a floor plan from a JSON file the user picked. Files saved by older versions held a list
+  // of floors; the first one is used.
   const importMap = async (file: File) => {
     if (recording || computing) return;
     const loadId = ++mapLoadId.current;
     setMapError(null);
     try {
       const data = JSON.parse(await file.text());
-      const floorsIn: unknown[] = Array.isArray(data?.floors) && data.floors.length > 0 ? data.floors : [data];
-      const loaded: Floor[] = floorsIn.slice(0, MAX_FLOORS).map((raw, i) => {
-        try {
-          return { building: parseBuilding(raw), fireStarts: readFireStarts(raw) };
-        } catch (err) {
-          throw floorsIn.length > 1 ? new Error(`floor ${i + 1}: ${err instanceof Error ? err.message : String(err)}`) : err;
-        }
-      });
-      if (loadId === mapLoadId.current) {
-        showMap(loaded[0].building, "", file.name);
-        changeFloors(loaded, 0);
-      }
+      const raw: unknown = Array.isArray(data?.floors) && data.floors.length > 0 ? data.floors[0] : data;
+      const loaded = parseBuilding(raw);
+      if (loadId === mapLoadId.current) showMap(loaded, "", file.name, readFireStarts(raw));
     } catch (err) {
       if (loadId !== mapLoadId.current) return;
       const why = err instanceof SyntaxError ? "the file is not valid JSON" : err instanceof Error ? err.message : String(err);
@@ -240,14 +271,11 @@ export default function App() {
   // The layout and the fire can be changed until a run exists.
   const editable = !recording && !computing && !before;
 
-  // Saves the layout as a JSON file that Import can read back. The top level is the floor shown,
-  // in the same format as the example maps; `floors` holds every floor with its fire starts.
-  // After the overseer's fixes have been applied, the fixed layout is what gets saved.
+  // Saves the layout and its fire starts as a JSON file that Import can read back, in the same format
+  // as the example maps. After the overseer's fixes have been applied, the fixed layout is saved.
   const exportLayout = () => {
-    const all = before ? [{ building, fireStarts: recording?.scenario.fireStarts ?? fireStarts }] : floorsRef.current;
-    const shown = before ? 0 : level;
-    const floorJson = (f: Floor) => ({ ...f.building, fireStarts: f.fireStarts });
-    const data = { ...floorJson(all[shown]), floors: all.map(floorJson) };
+    const saved = before ? { building, fireStarts: recording?.scenario.fireStarts ?? fireStarts } : floorRef.current;
+    const data = { ...saved.building, fireStarts: saved.fireStarts };
     const name = (importedName?.replace(/\.json$/i, "") || MAPS.find((m) => m.id === mapId)?.name || "floor-plan").replace(/\s+/g, "-").toLowerCase();
     const url = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: "application/json" }));
     const link = document.createElement("a");
@@ -257,57 +285,26 @@ export default function App() {
     setTimeout(() => URL.revokeObjectURL(url), 10_000); // revoking right away can cancel the download
   };
 
-  // Replaces the floors, and keeps the building the sim runs on in step with the floor shown.
-  const changeFloors = (next: Floor[], nextLevel: number) => {
-    floorsRef.current = next;
-    setFloors(next);
-    setLevel(nextLevel);
-    setBuilding(next[nextLevel].building);
-  };
-
-  // Switches to a picked or imported floor plan. A new plan starts as one floor with no fire.
-  const showMap = (loaded: Building, id: string, fileName: string | null) => {
-    setMapId(id);
-    setImportedName(fileName);
-    setPlan(loaded);
-    changeFloors([{ building: loaded, fireStarts: [] }], 0);
-  };
-
-  // Applies the tool in hand to some cells of the floor shown. A fire is toggled by a click, never by a drag.
+  // Applies the tool in hand to some cells. A fire is toggled by a click or tap, never by a drag.
   const paint = (cells: [number, number][], dragging: boolean) => {
     if (!editable) return;
-    const all = floorsRef.current;
-    let floor = all[level];
+    let next = floorRef.current;
     for (const [x, y] of cells) {
-      if (tool !== "fire") floor = paintCell(floor, x, y, tool);
-      else if (!dragging) floor = toggleFireStart(floor, x, y);
+      if (tool !== "fire") next = paintCell(next, x, y, tool);
+      else if (!dragging) next = toggleFireStart(next, x, y);
     }
-    if (floor !== all[level]) changeFloors(all.map((f, i) => (i === level ? floor : f)), level);
+    if (next !== floorRef.current) changeFloor(next);
   };
 
   // A click on the floor plan applies the tool in hand to that cell. With the default tool, that toggles a fire.
   const toggleFire = (x: number, y: number) => paint([[x, y]], false);
 
-  // The new floor goes above the one shown and starts as a copy of it.
-  const addFloor = () => {
-    const all = floorsRef.current;
-    if (all.length >= MAX_FLOORS) return;
-    changeFloors([...all.slice(0, level + 1), copyFloor(all[level]), ...all.slice(level + 1)], level + 1);
-  };
+  const clearFire = () => changeFloor({ ...floorRef.current, fireStarts: [] });
 
-  const removeFloor = () => {
-    const all = floorsRef.current;
-    if (all.length <= 1) return;
-    const next = all.filter((_, i) => i !== level);
-    changeFloors(next, Math.min(level, next.length - 1));
-  };
-
-  const clearFire = () => changeFloors(floorsRef.current.map((f, i) => (i === level ? { ...f, fireStarts: [] } : f)), level);
-
-  // Back to the picked floor plan as it was loaded: one floor, no edits.
+  // Back to the picked floor plan as it was loaded, with no edits.
   const resetLayout = () => {
     setTool("fire");
-    changeFloors([{ building: plan, fireStarts: [] }], 0);
+    changeFloor({ building: plan, fireStarts: [] });
   };
 
   // Space plays or pauses (or starts the run); the arrow keys step one tick; Escape leaves the first-person view.
@@ -347,10 +344,316 @@ export default function App() {
   // The selected person is followed in first person until they are out of the building.
   const picked = recording && layers.selected !== null && layers.selected < recording.agents.length ? layers.selected : null;
   const follow = recording && picked !== null && recording.status[frame * recording.agents.length + picked] !== EVACUATED ? picked : null;
-  const below = useMemo(() => floors.slice(0, level).map((f) => f.building), [floors, level]);
   const step: Step = before ? "prove" : showResults ? "diagnose" : recording || computing ? "simulate" : "setup";
   // The right-hand panel shows one thing at a time: results or people.
   const tab: Tab = tabChoice && tabChoice.run === recording ? tabChoice.tab : "results";
+  const editorOpen = phone && phoneEdit && editable; // the phone's full-screen editor
+
+  // ---- The pieces both layouts are built from ----
+
+  const importButton = (label: boolean) => (
+    <label
+      className={editable ? "file-button" : "file-button disabled"}
+      title={editable ? "Load a floor plan from a JSON file" : "Floor plans can only be changed during set up"}
+      aria-label="Import a floor plan"
+    >
+      <Icon name="upload" size={16} />
+      {label && "Import"}
+      <input
+        type="file"
+        accept=".json,application/json"
+        disabled={!editable}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) importMap(file);
+          e.target.value = ""; // so the same file can be picked again after fixing it
+        }}
+      />
+    </label>
+  );
+
+  const followNote = follow !== null && recording && (
+    <div className="viewport-note follow">
+      Seeing through #{follow + 1}, a {BEHAVIOR_NAME[recording.agents[follow].behavior].toLowerCase()} {recording.agents[follow].type}
+      <button className="glass" onMouseDown={(e) => e.preventDefault()} onClick={() => setLayers({ ...layers, selected: null })}>
+        Exit view
+      </button>
+    </div>
+  );
+
+  const transport = (
+    <Transport
+      ready={recording !== null}
+      busy={computing}
+      playing={playback.playing}
+      playhead={playback.playhead}
+      lastFrame={recording ? recording.frames - 1 : 0}
+      speed={playback.speed}
+      onToggle={recording ? playback.toggle : run}
+      onSeek={playback.seek}
+      onScrubStart={playback.scrubStart}
+      onScrubEnd={playback.scrubEnd}
+      onSpeed={playback.setSpeed}
+    />
+  );
+
+  const readout = (
+    <Readout building={building} recording={recording} playhead={playback.playhead} agentCount={agentCount} fireCount={fireStarts.length} />
+  );
+
+  const overseer = showResults ? (
+    <OverseerPanel
+      proposal={proposal}
+      preview={preview}
+      impact={impact}
+      busy={asking}
+      error={askError}
+      replay={replay}
+      before={before}
+      after={recording}
+      onReplay={setReplay}
+      onAsk={ask}
+      onApply={applyProposal}
+    />
+  ) : (
+    <section className="card panel overseer-intro">
+      <h2 className="eyebrow">Overseer</h2>
+      <p className="hint">
+        {before
+          ? "Re-running the same crowd with the fixes in place. The before and after comparison appears here when the run ends."
+          : recording
+            ? "When the run ends, the overseer reads the results here, explains where people got stuck and proposes up to three layout fixes."
+            : "Run a simulation first. When it ends, the overseer reads the results here and proposes layout fixes."}
+      </p>
+      <ol className="overseer-steps">
+        <li className={showResults || before ? "done" : ""}>Explains the bottleneck</li>
+        <li className={before ? "done" : ""}>Proposes up to 3 fixes</li>
+        <li>Proves them with a re-run on the same crowd</li>
+      </ol>
+    </section>
+  );
+
+  const mapCard = (
+    <section className="card map-card">
+      <header className="card-head">
+        <h2 className="eyebrow">Floor plan</h2>
+        <button
+          className={layers.grid ? "icon-button toggle on" : "icon-button toggle"}
+          aria-pressed={layers.grid}
+          aria-label={layers.grid ? "Hide the grid" : "Show the grid"}
+          title={layers.grid ? "Hide the grid" : "Show the grid"}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => setLayers({ ...layers, grid: !layers.grid })}
+        >
+          <Icon name="grid" size={16} />
+        </button>
+      </header>
+      <MapCanvas
+        building={building}
+        recording={recording}
+        fireStarts={fireStarts}
+        playhead={playback.playhead}
+        layers={layers}
+        rings={rings}
+        proposed={proposed}
+        onCellClick={recording || computing || phone ? undefined : toggleFire}
+      />
+    </section>
+  );
+
+  const scenario = (
+    <ScenarioPanel
+      mapError={mapError}
+      importedName={importedName}
+      onImport={importMap}
+      seed={seed}
+      agentCount={agentCount}
+      fireCount={fireStarts.length}
+      busy={computing}
+      simulatedSec={simulatedSec}
+      onSeed={setSeed}
+      onAgentCount={setAgentCount}
+      onClearFire={clearFire}
+      onResetLayout={resetLayout}
+      onRun={run}
+    >
+      <PlanPicker maps={MAPS} mapId={mapId} importedName={importedName} onMap={pickMap} disabled={computing} />
+    </ScenarioPanel>
+  );
+
+  const rerunning = (
+    <section className="card panel">
+      <p className="hint">Re-running the same crowd with the edits applied…</p>
+    </section>
+  );
+
+  const people = recording && counts && (
+    <PeoplePanel recording={recording} frame={frame} layers={layers} onLayers={setLayers}>
+      <LayerPanel layers={layers} onChange={setLayers} counts={counts} />
+    </PeoplePanel>
+  );
+
+  const viewport = (children: ReactNode, opts: { tool: Tool | null; showHelp?: boolean }) => (
+    <Viewport3D
+      building={building}
+      recording={recording}
+      fireStarts={fireStarts}
+      playhead={playback.playhead}
+      playing={playback.playing}
+      layers={layers}
+      rings={rings}
+      tool={opts.tool}
+      follow={follow}
+      resetRef={resetCamera}
+      showHelp={opts.showHelp}
+      onPaint={paint}
+    >
+      {children}
+    </Viewport3D>
+  );
+
+  // ---- Phone ----
+
+  if (phone) {
+    const goTab = (next: PhoneTab) => {
+      setPhoneTab(next);
+      phoneScroll.current?.scrollTo({ top: 0 });
+    };
+    // On the phone, picking someone to follow takes you to the 3D view to see through their eyes.
+    const phonePeople = recording && counts && (
+      <PeoplePanel
+        recording={recording}
+        frame={frame}
+        layers={layers}
+        onLayers={(next) => {
+          setLayers(next);
+          if (next.selected !== null && next.selected !== layers.selected) phoneScroll.current?.scrollTo({ top: 0, behavior: "smooth" });
+        }}
+      >
+        <LayerPanel layers={layers} onChange={setLayers} counts={counts} />
+      </PeoplePanel>
+    );
+    const hint = (text: string, action?: { label: string; onClick: () => void }) => (
+      <section className="card panel">
+        <p className="hint">{text}</p>
+        {action && (
+          <button className="small" onClick={action.onClick}>
+            {action.label}
+          </button>
+        )}
+      </section>
+    );
+    return (
+      <div className={editorOpen ? "phone editing" : "phone"}>
+
+
+        {/* Everything scrolls together, header included. The 3D view is a box in it, on the Simulate tab;
+            other tabs hide it (it stays loaded, so the camera and run carry on). In the editor it fills the screen. */}
+        <main className="p-content" ref={phoneScroll}>
+          {!editorOpen && (
+            <header className="p-header">
+              <span className="p-logo">
+                <Icon name="exit" size={22} />
+              </span>
+              <div className="p-title">
+                <b>Egress</b>
+                <small>
+                  Step {STEP_NUMBER[step]} of 4 · {STEP_NAME[step]}
+                </small>
+              </div>
+              <div className="p-actions">
+                {importButton(false)}
+                <button className="p-round" aria-label="Export the floor plan" onClick={exportLayout}>
+                  <Icon name="download" size={18} />
+                </button>
+              </div>
+            </header>
+          )}
+          <section className={editorOpen || phoneTab === "sim" ? "p-stage" : "p-stage off"}>
+            {viewport(
+              editorOpen ? (
+                <PhoneEditor
+                  tool={tool}
+                  onTool={setTool}
+                  maps={MAPS}
+                  mapId={mapId}
+                  importedName={importedName}
+                  onMap={pickMap}
+                  fireCount={fireStarts.length}
+                  onClearFire={clearFire}
+                  onResetCamera={() => resetCamera.current?.()}
+                  onDone={() => setPhoneEdit(false)}
+                />
+              ) : (
+                <>
+                  {computing && <p className="viewport-note">Simulating… {simulatedSec.toFixed(0)} s</p>}
+                  {followNote}
+                  {picked !== null && follow === null && <p className="viewport-note">#{picked + 1} is out of the building.</p>}
+                </>
+              ),
+              { tool: editorOpen ? tool : null, showHelp: editorOpen },
+            )}
+          </section>
+          {!editorOpen && (
+            <>
+              {phoneTab === "sim" && (
+                <>
+                  <div className="p-transport">{transport}</div>
+                  {readout}
+                  {(recording || before) && (
+                    <button className="p-edit-cta" onClick={reset}>
+                      <span className="p-edit-icon">
+                        <Icon name="replay" size={18} />
+                      </span>
+                      <span>
+                        <b>New scenario</b>
+                        <small>Back to set up, keeping this floor plan</small>
+                      </span>
+                    </button>
+                  )}
+                  {editable && (
+                    <button className="p-edit-cta" onClick={() => setPhoneEdit(true)}>
+                      <span className="p-edit-icon">
+                        <Icon name="pencil" size={18} />
+                      </span>
+                      <span>
+                        <b>Open the editor</b>
+                        <small>Place fire, walls, doors and exits</small>
+                      </span>
+                    </button>
+                  )}
+                  {!recording && !before && scenario}
+                  {!recording && before && rerunning}
+                  {phonePeople}
+                </>
+              )}
+              {phoneTab === "results" && (
+                <>
+                  {mapCard}
+                  {recording && <div className="p-transport">{transport}</div>}
+                  {recording && <EvacuationChart recording={recording} playhead={playback.playhead} />}
+                  {showResults
+                    ? <ResultsPanel recording={recording} />
+                    : recording
+                      ? hint("Which exits people used and where they got stuck appear when the run ends.", { label: "Skip to the end", onClick: () => playback.seek(recording.frames - 1) })
+                      : hint("Run a simulation to see where people went and where they got stuck.")}
+                </>
+              )}
+              {phoneTab === "overseer" && overseer}
+            </>
+          )}
+        </main>
+        {!editorOpen && <PhoneNav tab={phoneTab} onTab={goTab} />}
+
+        <div className="rotate-hint" aria-hidden="true">
+          <Icon name="rotate" size={36} />
+          Turn your phone upright
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Desktop and tablet ----
 
   return (
     <div className="app">
@@ -364,23 +667,7 @@ export default function App() {
         </div>
         <Steps current={step} />
         <div className="topbar-side">
-          <label
-            className={editable ? "file-button" : "file-button disabled"}
-            title={editable ? "Load a floor plan from a JSON file" : "Floor plans can only be changed during set up"}
-          >
-            <Icon name="upload" size={16} />
-            Import
-            <input
-              type="file"
-              accept=".json,application/json"
-              disabled={!editable}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) importMap(file);
-                e.target.value = ""; // so the same file can be picked again after fixing it
-              }}
-            />
-          </label>
+          {importButton(true)}
           <button className="small" title="Save the floor plan as a JSON file" onClick={exportLayout}>
             <Icon name="download" size={16} />
             Export
@@ -395,125 +682,29 @@ export default function App() {
 
       <main className="stage">
         {/* Left: the overseer, which reads the finished run and proposes fixes. */}
-        <aside className="over-col">
-          {showResults ? (
-            <OverseerPanel
-              proposal={proposal}
-              preview={preview}
-              impact={impact}
-              busy={asking}
-              error={askError}
-              replay={replay}
-              before={before}
-              after={recording}
-              onReplay={setReplay}
-              onAsk={ask}
-              onApply={applyProposal}
-            />
-          ) : (
-            <section className="card panel overseer-intro">
-              <h2 className="eyebrow">Overseer</h2>
-              <p className="hint">
-                {before
-                  ? "Re-running the same crowd with the fixes in place. The before and after comparison appears here when the run ends."
-                  : recording
-                    ? "When the run ends, the overseer reads the results here, explains where people got stuck and proposes up to three layout fixes."
-                    : "Run a simulation first. When it ends, the overseer reads the results here and proposes layout fixes."}
-              </p>
-              <ol className="overseer-steps">
-                <li className={showResults || before ? "done" : ""}>Explains the bottleneck</li>
-                <li className={before ? "done" : ""}>Proposes up to 3 fixes</li>
-                <li>Proves them with a re-run on the same crowd</li>
-              </ol>
-            </section>
-          )}
-        </aside>
+        <aside className="over-col">{overseer}</aside>
 
         <section className="main-col">
           <div className="player card">
-            <Viewport3D
-              building={building}
-              below={below}
-              recording={recording}
-              fireStarts={fireStarts}
-              playhead={playback.playhead}
-              playing={playback.playing}
-              layers={layers}
-              rings={rings}
-              tool={editable ? tool : null}
-              follow={follow}
-              onPaint={paint}
-            >
-              {editable && <ToolBar tool={tool} onTool={setTool} />}
-              {editable && <FloorPicker count={floors.length} level={level} onSelect={(i) => changeFloors(floorsRef.current, i)} onAdd={addFloor} onRemove={removeFloor} />}
-              {!editable && floors.length > 1 && (
-                <p className="viewport-tag">
-                  Floor {level + 1} of {floors.length}
-                </p>
-              )}
-              {editable && tool === "fire" && fireStarts.length === 0 && (
-                <p className="viewport-note">Click the floor to start a fire, then run the simulation.</p>
-              )}
-              {computing && <p className="viewport-note">Simulating… {simulatedSec.toFixed(0)} s</p>}
-              {follow !== null && recording && (
-                <div className="viewport-note follow">
-                  Seeing through #{follow + 1}, a {BEHAVIOR_NAME[recording.agents[follow].behavior].toLowerCase()} {recording.agents[follow].type}
-                  <button className="glass" onMouseDown={(e) => e.preventDefault()} onClick={() => setLayers({ ...layers, selected: null })}>
-                    Exit view
-                  </button>
-                </div>
-              )}
-              {picked !== null && follow === null && <p className="viewport-note">#{picked + 1} is out of the building.</p>}
-            </Viewport3D>
-            <Transport
-              ready={recording !== null}
-              busy={computing}
-              playing={playback.playing}
-              playhead={playback.playhead}
-              lastFrame={recording ? recording.frames - 1 : 0}
-              speed={playback.speed}
-              onToggle={recording ? playback.toggle : run}
-              onSeek={playback.seek}
-              onScrubStart={playback.scrubStart}
-              onScrubEnd={playback.scrubEnd}
-              onSpeed={playback.setSpeed}
-            />
+            {viewport(
+              <>
+                {editable && <ToolBar tool={tool} onTool={setTool} />}
+                {editable && tool === "fire" && fireStarts.length === 0 && (
+                  <p className="viewport-note">Click the floor to start a fire, then run the simulation.</p>
+                )}
+                {computing && <p className="viewport-note">Simulating… {simulatedSec.toFixed(0)} s</p>}
+                {followNote}
+                {picked !== null && follow === null && <p className="viewport-note">#{picked + 1} is out of the building.</p>}
+              </>,
+              { tool: editable ? tool : null },
+            )}
+            {transport}
           </div>
-          <Readout
-            building={building}
-            recording={recording}
-            playhead={playback.playhead}
-            agentCount={agentCount}
-            fireCount={fireStarts.length}
-          />
+          {readout}
         </section>
 
         <aside className="side-col" data-tab={recording ? tab : undefined}>
-          <section className="card map-card">
-            <header className="card-head">
-              <h2 className="eyebrow">Floor plan</h2>
-              <button
-                className={layers.grid ? "icon-button toggle on" : "icon-button toggle"}
-                aria-pressed={layers.grid}
-                aria-label={layers.grid ? "Hide the grid" : "Show the grid"}
-                title={layers.grid ? "Hide the grid" : "Show the grid"}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => setLayers({ ...layers, grid: !layers.grid })}
-              >
-                <Icon name="grid" size={16} />
-              </button>
-            </header>
-            <MapCanvas
-              building={building}
-              recording={recording}
-              fireStarts={fireStarts}
-              playhead={playback.playhead}
-              layers={layers}
-              rings={rings}
-              proposed={proposed}
-              onCellClick={recording || computing ? undefined : toggleFire}
-            />
-          </section>
+          {mapCard}
 
           {recording && (
             <Segmented
@@ -532,41 +723,11 @@ export default function App() {
 
           {/* Only this part scrolls: the floor plan and the tabs above it stay in place. */}
           <div className="side-scroll" ref={sideScroll}>
-          {!recording && !before && (
-            <ScenarioPanel
-              mapError={mapError}
-              importedName={importedName}
-              onImport={importMap}
-              seed={seed}
-              agentCount={agentCount}
-              fireCount={fireStarts.length}
-              busy={computing}
-              simulatedSec={simulatedSec}
-              onSeed={setSeed}
-              onAgentCount={setAgentCount}
-              onClearFire={clearFire}
-              onResetLayout={resetLayout}
-              onRun={run}
-            >
-              <PlanPicker maps={MAPS} mapId={mapId} importedName={importedName} onMap={pickMap} disabled={computing} />
-            </ScenarioPanel>
-          )}
-          {!recording && before && (
-            <section className="card panel">
-              <p className="hint">Re-running the same crowd with the edits applied…</p>
-            </section>
-          )}
-          {recording && tab === "results" && <EvacuationChart recording={recording} playhead={playback.playhead} />}
-          {recording && counts && tab === "people" && (
-            <PeoplePanel recording={recording} frame={frame} layers={layers} onLayers={setLayers}>
-              <LayerPanel layers={layers} onChange={setLayers} counts={counts} />
-            </PeoplePanel>
-          )}
-          {showResults && tab === "results" && (
-            <ResultsPanel
-              recording={recording}
-            />
-          )}
+            {!recording && !before && scenario}
+            {!recording && before && rerunning}
+            {recording && tab === "results" && <EvacuationChart recording={recording} playhead={playback.playhead} />}
+            {tab === "people" && people}
+            {showResults && tab === "results" && <ResultsPanel recording={recording} />}
           </div>
         </aside>
       </main>
