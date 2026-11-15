@@ -219,6 +219,25 @@
   gap: 6px;
 }
 
+/* The floor plan dropdown sits under the tools. */
+.plan-picker {
+  position: absolute;
+  top: 58px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.plan-picker select {
+  padding-right: 8px;
+  font: inherit;
+  font-size: var(--fs-small);
+  font-weight: 600;
+  color-scheme: dark;
+  cursor: pointer;
+}
+
 .floor-picker {
   position: absolute;
   top: 12px;
@@ -331,15 +350,11 @@
 
 /* Time is the least important number here, so it is small and quiet. */
 .transport-time {
-  min-width: 104px;
+  min-width: 52px;
   font-size: var(--fs-small);
   font-weight: 500;
   color: var(--text-2);
   white-space: nowrap;
-}
-
-.transport-time span {
-  color: var(--text-3);
 }
 
 /* The timeline. A real range input lies invisibly on top and does the work; the groove, the fill

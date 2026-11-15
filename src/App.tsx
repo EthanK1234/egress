@@ -10,6 +10,7 @@ import { usePlayback } from "./components/usePlayback";
 import Viewport3D from "./components/Viewport3D";
 import FloorPicker from "./components/FloorPicker";
 import Icon from "./components/Icon";
+import PlanPicker from "./components/PlanPicker";
 import PeoplePanel from "./components/PeoplePanel";
 import Segmented from "./components/Segmented";
 import Steps, { type Step } from "./components/Steps";
@@ -331,6 +332,7 @@ export default function App() {
               onPaint={paint}
             >
               {editable && <ToolBar tool={tool} onTool={setTool} />}
+              {editable && <PlanPicker maps={MAPS} mapId={mapId} importedName={importedName} onMap={pickMap} />}
               {editable && <FloorPicker count={floors.length} level={level} onSelect={(i) => changeFloors(floorsRef.current, i)} onAdd={addFloor} onRemove={removeFloor} />}
               {!editable && floors.length > 1 && (
                 <p className="viewport-tag">
@@ -396,11 +398,8 @@ export default function App() {
 
           {!recording && !before && (
             <ScenarioPanel
-              maps={MAPS}
-              mapId={mapId}
               mapError={mapError}
               importedName={importedName}
-              onMap={pickMap}
               onImport={importMap}
               seed={seed}
               agentCount={agentCount}

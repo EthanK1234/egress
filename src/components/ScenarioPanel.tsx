@@ -1,11 +1,7 @@
 import { COLOR } from "../render/palette";
-import type { MapInfo } from "../sim/maps";
 import Icon from "./Icon";
-import Segmented from "./Segmented";
 
 interface Props {
-  maps: MapInfo[];
-  mapId: string;
   mapError: string | null; // why the last picked or imported map could not be loaded
   importedName: string | null; // file name of the imported floor plan, while it is the one in use
   seed: number;
@@ -13,7 +9,6 @@ interface Props {
   fireCount: number;
   busy: boolean; // the run is being computed
   simulatedSec: number; // sim time computed so far, while busy
-  onMap: (id: string) => void;
   onImport: (file: File) => void;
   onSeed: (v: number) => void;
   onAgentCount: (v: number) => void;
@@ -35,17 +30,8 @@ export default function ScenarioPanel(p: Props) {
     <section className="card panel scenario">
       <h2 className="eyebrow">Set up</h2>
 
-      <div className="field stacked">
-        <span className="field-label">Floor plan</span>
-        <Segmented
-          label="Floor plan"
-          options={p.maps.map((m) => ({ value: m.id, label: m.name, disabled: p.busy }))}
-          value={p.mapId}
-          onChange={p.onMap}
-        />
-      </div>
       <div className="field">
-        <span className="field-label">{p.importedName ? `Using ${p.importedName}` : "Or use your own layout"}</span>
+        <span className="field-label">{p.importedName ? `Using ${p.importedName}` : "Your own floor plan"}</span>
         <label className={p.busy ? "file-button disabled" : "file-button"}>
           Import JSON
           <input

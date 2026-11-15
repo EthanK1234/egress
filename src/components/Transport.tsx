@@ -64,9 +64,8 @@ export default function Transport(p: Props) {
         </div>
       </div>
 
-      <span className="transport-time num">
+      <span className="transport-time num" title="Time since the alarm">
         {seconds(p.ready ? p.playhead : 0)}
-        {p.ready && <span> / {seconds(p.lastFrame)}</span>}
       </span>
 
       <Segmented label="Playback speed" options={SPEED_OPTIONS} value={p.speed} onChange={p.onSpeed} />
