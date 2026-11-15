@@ -21,8 +21,8 @@ No other libraries: no Tailwind, no state library, no test framework, no 3D libr
 - The numbers above the 3D view lead with Survived and Survival rate. Time is deliberately the least prominent.
 - Results appear once playback reaches the end of the run.
 - The 3D view draws only when something changed. Flames and paths are uploaded once per run and animated in the shaders from the playhead; walls are one static mesh; people and flames are instanced.
-- Look: neumorphic (soft light surface, dark inset "screens" for the 3D view and floor plan). All of it is tokens in src/styles/tokens.css; src/index.css only imports src/styles/ and holds feature CSS appended below.
-- Font: Figtree, self-hosted Latin subset in public/fonts/.
+- Look: clean white cards on an off-white page, three-color palette (navy, steel blue, tangerine standout), dark "screens" for the 3D view and floor plan. All of it is tokens in src/styles/tokens.css; src/index.css only imports src/styles/ and holds feature CSS appended below.
+- Font: Kazesawa, self-hosted Latin subset in public/fonts/.
 
 ## Sim rules
 - Grid cell = 0.5 m, tick = 0.5 s. Cells: 0 EMPTY, 1 WALL, 2 DOOR, 3 EXIT.
@@ -53,8 +53,8 @@ interface OverseerProposal { diagnosis: string; edits: BuildingEdit[]; expectedI
 - src/editor/: layout editing, no React (layout)
 - src/styles/: the design system (tokens, base, layout, panels)
 - src/ai/: Gemini calls (gemini.ts client, floorplan.ts, overseer.ts)
-- src/components/: React UI (Viewport3D, MapCanvas, Transport, Readout, LayerPanel, PeoplePanel, ScenarioPanel, ResultsPanel, OverseerPanel, ToolBar, FloorPicker, Steps, Segmented, Switch, Icon, usePlayback)
-- public/fonts/: Figtree font file and licence
+- src/components/: React UI (Viewport3D, MapCanvas, Transport, Readout, LayerPanel, PeoplePanel, ScenarioPanel, ResultsPanel, OverseerPanel, ToolBar, FloorPicker, PlanPicker, EvacuationChart, Steps, Segmented, Switch, Icon, usePlayback)
+- public/fonts/: Kazesawa font files and licence
 - public/maps/: example floor plans as Building JSON (two-rooms, office, venue), listed in src/sim/maps.ts
 - public/cache/: saved Gemini responses for offline demo
 

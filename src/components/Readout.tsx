@@ -39,8 +39,8 @@ export default function Readout({ building, recording, playhead, agentCount, fir
   const live = playhead < last; // the run is still going, so these are running totals
   const parts = [
     { name: "survived", count: survived, color: "var(--accent)" },
-    { name: "still inside", count: inside, color: "var(--text-3)" },
-    { name: "trapped", count: trapped, color: "var(--text)" },
+    { name: "still inside", count: inside, color: "var(--muted-mark)" },
+    { name: "trapped", count: trapped, color: "var(--standout)" },
   ];
 
   return (
@@ -51,9 +51,9 @@ export default function Readout({ building, recording, playhead, agentCount, fir
         label="Still inside"
         value={inside}
         note={frozen > 0 ? `${frozen} frozen` : undefined}
-        mark={<i className="dot" style={{ background: "var(--text-3)" }} />}
+        mark={<i className="dot" style={{ background: "var(--muted-mark)" }} />}
       />
-      <Stat label="Trapped" value={trapped} mark={<i className="dot" style={{ background: "var(--text)" }} />} />
+      <Stat label="Trapped" value={trapped} mark={<i className="dot" style={{ background: "var(--standout)" }} />} />
       <div className="split" role="img" aria-label={parts.map((part) => `${part.count} ${part.name}`).join(", ")}>
         {parts.map((part) => part.count > 0 && <i key={part.name} style={{ flexGrow: part.count, background: part.color }} />)}
       </div>

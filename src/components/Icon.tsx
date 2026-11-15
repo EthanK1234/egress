@@ -13,6 +13,20 @@ const SHAPES = {
   ),
   skip: <path d="M5.5 5.5v13l8.5-6.5zM16 5.5h2.5v13H16z" fill="currentColor" stroke="none" />,
   grid: <path d="M9 4v16M15 4v16M4 9h16M4 15h16" />,
+  upload: (
+    <>
+      <path d="M12 15V4" />
+      <path d="M7.5 8.5L12 4l4.5 4.5" />
+      <path d="M5 14v4.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V14" />
+    </>
+  ),
+  download: (
+    <>
+      <path d="M12 4v11" />
+      <path d="M7.5 10.5L12 15l4.5-4.5" />
+      <path d="M5 14v4.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V14" />
+    </>
+  ),
   check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
   plus: <path d="M12 5v14M5 12h14" />,
   minus: <path d="M5 12h14" />,

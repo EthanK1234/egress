@@ -11,6 +11,7 @@ import Viewport3D from "./components/Viewport3D";
 import FloorPicker from "./components/FloorPicker";
 import Icon from "./components/Icon";
 import PlanPicker from "./components/PlanPicker";
+import EvacuationChart from "./components/EvacuationChart";
 import PeoplePanel from "./components/PeoplePanel";
 import Segmented from "./components/Segmented";
 import Steps, { type Step } from "./components/Steps";
@@ -27,6 +28,13 @@ import { testMap } from "./sim/testMap";
 import type { Behavior, Building, OverseerProposal } from "./sim/types";
 
 const NO_RINGS: { x: number; y: number }[] = [];
+
+// Fire starts saved alongside a floor by Export. Anything malformed is ignored.
+function readFireStarts(raw: unknown): [number, number][] {
+  const list = (raw as { fireStarts?: unknown })?.fireStarts;
+  if (!Array.isArray(list)) return [];
+  return list.filter((p): p is [number, number] => Array.isArray(p) && Number.isInteger(p[0]) && Number.isInteger(p[1]));
+}
 const SLICE_MS = 12; // time spent computing the run per animation frame, so the page stays responsive
 // testMap is the same plan as the first entry in MAPS, so the app has a building before any file loads.
 const DEFAULT_FLOOR: Floor = { building: testMap, fireStarts: [] };
@@ -180,8 +188,19 @@ export default function App() {
     const loadId = ++mapLoadId.current;
     setMapError(null);
     try {
-      const loaded = parseBuilding(JSON.parse(await file.text()));
-      if (loadId === mapLoadId.current) showMap(loaded, "", file.name);
+      const data = JSON.parse(await file.text());
+      const floorsIn: unknown[] = Array.isArray(data?.floors) && data.floors.length > 0 ? data.floors : [data];
+      const loaded: Floor[] = floorsIn.slice(0, MAX_FLOORS).map((raw, i) => {
+        try {
+          return { building: parseBuilding(raw), fireStarts: readFireStarts(raw) };
+        } catch (err) {
+          throw floorsIn.length > 1 ? new Error(`floor ${i + 1}: ${err instanceof Error ? err.message : String(err)}`) : err;
+        }
+      });
+      if (loadId === mapLoadId.current) {
+        showMap(loaded[0].building, "", file.name);
+        changeFloors(loaded, 0);
+      }
     } catch (err) {
       if (loadId !== mapLoadId.current) return;
       const why = err instanceof SyntaxError ? "the file is not valid JSON" : err instanceof Error ? err.message : String(err);
@@ -191,6 +210,23 @@ export default function App() {
 
   // The layout and the fire can be changed until a run exists.
   const editable = !recording && !computing && !before;
+
+  // Saves the layout as a JSON file that Import can read back. The top level is the floor shown,
+  // in the same format as the example maps; `floors` holds every floor with its fire starts.
+  // After the overseer's fixes have been applied, the fixed layout is what gets saved.
+  const exportLayout = () => {
+    const all = before ? [{ building, fireStarts: recording?.scenario.fireStarts ?? fireStarts }] : floorsRef.current;
+    const shown = before ? 0 : level;
+    const floorJson = (f: Floor) => ({ ...f.building, fireStarts: f.fireStarts });
+    const data = { ...floorJson(all[shown]), floors: all.map(floorJson) };
+    const name = (importedName?.replace(/\.json$/i, "") || MAPS.find((m) => m.id === mapId)?.name || "floor-plan").replace(/\s+/g, "-").toLowerCase();
+    const url = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${name}${before ? "-fixed" : ""}.json`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000); // revoking right away can cancel the download
+  };
 
   // Replaces the floors, and keeps the building the sim runs on in step with the floor shown.
   const changeFloors = (next: Floor[], nextLevel: number) => {
@@ -300,6 +336,27 @@ export default function App() {
         </div>
         <Steps current={step} />
         <div className="topbar-side">
+          <label
+            className={editable ? "file-button" : "file-button disabled"}
+            title={editable ? "Load a floor plan from a JSON file" : "Floor plans can only be changed during set up"}
+          >
+            <Icon name="upload" size={16} />
+            Import
+            <input
+              type="file"
+              accept=".json,application/json"
+              disabled={!editable}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) importMap(file);
+                e.target.value = ""; // so the same file can be picked again after fixing it
+              }}
+            />
+          </label>
+          <button className="small" title="Save the floor plan as a JSON file" onClick={exportLayout}>
+            <Icon name="download" size={16} />
+            Export
+          </button>
           {(recording || before) && (
             <button className="small" onClick={reset}>
               New scenario
@@ -332,7 +389,6 @@ export default function App() {
               onPaint={paint}
             >
               {editable && <ToolBar tool={tool} onTool={setTool} />}
-              {editable && <PlanPicker maps={MAPS} mapId={mapId} importedName={importedName} onMap={pickMap} />}
               {editable && <FloorPicker count={floors.length} level={level} onSelect={(i) => changeFloors(floorsRef.current, i)} onAdd={addFloor} onRemove={removeFloor} />}
               {!editable && floors.length > 1 && (
                 <p className="viewport-tag">
@@ -411,7 +467,9 @@ export default function App() {
               onClearFire={clearFire}
               onResetLayout={resetLayout}
               onRun={run}
-            />
+            >
+              <PlanPicker maps={MAPS} mapId={mapId} importedName={importedName} onMap={pickMap} disabled={computing} />
+            </ScenarioPanel>
           )}
           {!recording && before && (
             <section className="card panel">
@@ -430,14 +488,7 @@ export default function App() {
               onChange={(next: Tab) => setTabChoice({ tab: next, run: recording })}
             />
           )}
-          {recording && !showResults && tab === "results" && (
-            <section className="card panel">
-              <p className="hint">Which exits people used and where they got stuck appear when the run ends.</p>
-              <button className="small" onClick={() => playback.seek(recording.frames - 1)}>
-                Skip to the end
-              </button>
-            </section>
-          )}
+          {recording && tab === "results" && <EvacuationChart recording={recording} playhead={playback.playhead} />}
           {recording && counts && tab === "people" && (
             <PeoplePanel recording={recording} frame={frame} layers={layers} onLayers={setLayers}>
               <LayerPanel layers={layers} onChange={setLayers} counts={counts} />

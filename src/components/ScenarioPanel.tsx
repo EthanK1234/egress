@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { COLOR } from "../render/palette";
 import Icon from "./Icon";
 
@@ -15,6 +16,7 @@ interface Props {
   onClearFire: () => void;
   onResetLayout: () => void;
   onRun: () => void;
+  children?: ReactNode; // the floor plan picker, shown first
 }
 
 const MAX_PEOPLE = 1000;
@@ -29,6 +31,8 @@ export default function ScenarioPanel(p: Props) {
   return (
     <section className="card panel scenario">
       <h2 className="eyebrow">Set up</h2>
+
+      {p.children}
 
       <div className="field">
         <span className="field-label">{p.importedName ? `Using ${p.importedName}` : "Your own floor plan"}</span>
@@ -79,8 +83,12 @@ export default function ScenarioPanel(p: Props) {
         </button>
       </div>
 
-      <details className="advanced">
-        <summary>Advanced</summary>
+      <button className="primary wide" onClick={p.onRun} disabled={p.busy}>
+        {p.busy ? `Simulating… ${p.simulatedSec.toFixed(0)} s` : "Run simulation"}
+      </button>
+
+      <div className="advanced">
+        <h3 className="eyebrow">Advanced</h3>
         <div className="field" title="The same seed gives the same crowd, so a run can be repeated exactly">
           <label className="field-label" htmlFor="seed">
             Crowd seed
@@ -93,11 +101,7 @@ export default function ScenarioPanel(p: Props) {
             Reset to default
           </button>
         </div>
-      </details>
-
-      <button className="primary wide" onClick={p.onRun} disabled={p.busy}>
-        {p.busy ? `Simulating… ${p.simulatedSec.toFixed(0)} s` : "Run simulation"}
-      </button>
+      </div>
     </section>
   );
 }

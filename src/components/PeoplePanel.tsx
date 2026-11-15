@@ -17,9 +17,9 @@ const EXTRA_ROWS = 4; // rows drawn beyond the visible ones, so scrolling never 
 const STATUS: Record<number, { label: string; color: string }> = {
   [FROZEN]: { label: "Frozen", color: COLOR.frozen },
   [EVACUATED]: { label: "Survived", color: "var(--accent)" },
-  [TRAPPED]: { label: "Trapped", color: "var(--text)" },
+  [TRAPPED]: { label: "Trapped", color: "var(--standout)" },
 };
-const MOVING = { label: "Moving", color: "var(--text-3)" };
+const MOVING = { label: "Moving", color: "var(--muted-mark)" };
 
 // Everyone in the run, one row per person. Clicking a person follows them in first person in the 3D view.
 // Only the rows in view are in the page, so a crowd of a thousand costs the same as twenty.

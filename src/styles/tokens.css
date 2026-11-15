@@ -1,67 +1,100 @@
-/* The skin. Everything visual that makes this look "neumorphic" is a token here:
-   one soft surface, a light and a dark shadow lit from the top left, generous radii.
-   To try another look (for example a bento grid), swap these values and the layout
-   in layout.css; the components only refer to the tokens. */
+/* The skin. Colors, depth, shape and type are all tokens here; the components only refer to them.
+   Look: clean white cards on a cool off-white page, hairline borders, very soft shadows,
+   and Kazesawa as the voice: light weights for big numbers, tracked caps for labels.
+
+   Palette (three colors, the usual 60/30/10 split):
+   - Navy, the first primary: text, headings and dark elements.
+   - Steel blue, the second primary: selected states, fills, progress, people who survived.
+   - Tangerine, the one that stands out: the main action, the current step, and trapped people. */
 
 @font-face {
-  font-family: "Figtree";
-  src: url("/fonts/Figtree.woff2") format("woff2");
-  font-weight: 300 900;
+  font-family: "Kazesawa";
+  src: url("/fonts/Kazesawa-ExtraLight.woff2") format("woff2");
+  font-weight: 200;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Kazesawa";
+  src: url("/fonts/Kazesawa-Light.woff2") format("woff2");
+  font-weight: 300;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Kazesawa";
+  src: url("/fonts/Kazesawa-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Kazesawa";
+  src: url("/fonts/Kazesawa-Semibold.woff2") format("woff2");
+  font-weight: 500 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Kazesawa";
+  src: url("/fonts/Kazesawa-Bold.woff2") format("woff2");
+  font-weight: 700;
   font-display: swap;
 }
 
 :root {
   color-scheme: light;
 
-  /* Surface: a cool, very light gray. Cards are the same color as the page;
-     only their shadows lift them off it. */
-  --bg: #e6eaf0;
-  --surface: var(--bg);
-  --surface-2: #dde3ea;
-  --shade: rgba(163, 177, 198, 0.62);
-  --glow: rgba(255, 255, 255, 0.95);
+  /* Surfaces */
+  --bg: #f4f6f9; /* page */
+  --surface: #ffffff; /* cards, buttons */
+  --surface-2: #f4f6f9; /* wells: inputs, tracks, segmented controls */
 
-  /* Ink. Soft UI is low contrast by nature, so the text is not: 13:1, 6:1 and 4.8:1. */
-  --text: #1b2430;
-  --text-2: #4a5666;
-  --text-3: #5a6675;
-  --line: rgba(27, 36, 48, 0.08);
-  --line-2: rgba(27, 36, 48, 0.16);
+  /* Ink: navy, the first primary. 12.9:1, 6.9:1 and 5.4:1 on white. */
+  --text: #293241;
+  --text-2: #4f5b6e;
+  --text-3: #5f6b7e;
+  --line: #e4e8ee;
+  --line-2: #d3d9e2;
 
-  /* One accent: exit-sign green. White text on it is 4.7:1. */
-  --accent: #0a8540;
+  /* Steel blue, the second primary. White text on it is 7:1. */
+  --accent: #3d5a80;
+  --accent-soft: #e8eef6;
   --accent-ink: #ffffff;
-  --danger: #b82a2a;
 
-  /* The 3D view and the floor plan are dark "screens" set into the soft surface. */
+  /* Tangerine, the color that stands out. Marks use the bright step; text and the
+     main button use the deeper one, where white text is 4.5:1. */
+  --standout: #e4572e;
+  --standout-strong: #cf4a26;
+  --muted-mark: #aab4c3; /* people still inside, in the charts */
+  --danger: var(--standout-strong);
+
+  /* The 3D view and the floor plan are dark screens set into the page. */
   --screen: #0b0e12;
   --screen-text: #edf1f5;
   --screen-text-2: #b6c0cc;
   --screen-line: rgba(255, 255, 255, 0.14);
 
-  /* Depth. Blur is about twice the offset; pressed is the same pair turned inward. */
-  --raised: 8px 8px 18px var(--shade), -8px -8px 18px var(--glow);
-  --raised-sm: 4px 4px 9px var(--shade), -4px -4px 9px var(--glow);
-  --pressed: inset 4px 4px 9px var(--shade), inset -4px -4px 9px var(--glow);
-  --pressed-sm: inset 2px 2px 5px var(--shade), inset -2px -2px 5px var(--glow);
-  /* A dark screen can't show an inner shadow, so its rim is lit the other way round. */
-  --sunk: -3px -3px 7px var(--shade), 3px 3px 7px var(--glow);
+  /* Depth: a hairline and a soft, far shadow. No inner shadows. */
+  --shade: rgba(41, 50, 65, 0.16);
+  --glow: transparent;
+  --raised: 0 0 0 1px var(--line), 0 1px 2px rgba(41, 50, 65, 0.04), 0 12px 32px -18px rgba(41, 50, 65, 0.22);
+  --raised-sm: 0 0 0 1px var(--line-2), 0 1px 2px rgba(41, 50, 65, 0.06);
+  --pressed: inset 0 0 0 1px var(--line-2);
+  --pressed-sm: inset 0 0 0 1px var(--line);
+  --sunk: none;
 
   /* Shape. Inner radius = outer radius minus the padding between them. */
-  --radius: 24px;
-  --radius-inner: 14px;
-  --radius-control: 12px;
+  --radius: 18px;
+  --radius-inner: 10px;
+  --radius-control: 10px;
 
-  /* Space: 4, 8, 12, 16, 24, 32. Cards sit 24px apart so their shadows have room. */
-  --gap: 24px;
+  /* Space: 4, 8, 12, 16, 24, 32. */
+  --gap: 20px;
 
-  /* Type: one family, six sizes. */
-  --font: "Figtree", "Segoe UI", system-ui, sans-serif;
-  --fs-caps: 12px;
+  /* Type: one family. */
+  --font: "Kazesawa", "Segoe UI", system-ui, sans-serif;
+  --fs-caps: 11.5px;
   --fs-small: 13px;
   --fs-ui: 14px;
   --fs-body: 15px;
   --fs-title: 17px;
-  --fs-stat: 24px;
-  --fs-hero: 40px;
+  --fs-stat: 26px;
+  --fs-hero: 46px;
 }

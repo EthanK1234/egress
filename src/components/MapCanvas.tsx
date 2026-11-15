@@ -23,7 +23,7 @@ const FIRE_RGB = rgb255(COLOR.fire);
 const FIRE_FRONT_RGB = rgb255(COLOR.fireTip);
 const FIRE_OLD_RGB = rgb255(COLOR.ember);
 const FIRE_OLD_MIX = 0.45; // how far settled fire darkens
-const FONT = "Figtree, 'Segoe UI', sans-serif";
+const FONT = "Kazesawa, 'Segoe UI', sans-serif";
 const TAU = Math.PI * 2;
 
 // One color channel (0..2) of a cell that has burned for `age` frames:
