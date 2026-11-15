@@ -35,7 +35,8 @@ export default function Readout({ building, recording, playhead, agentCount, fir
   const trapped = recording.trapped[frame];
   const frozen = recording.frozen[frame];
   const inside = total - survived - trapped;
-  const rate = total > 0 ? Math.round((survived / total) * 100) : 0;
+  const exact = total > 0 ? (survived / total) * 100 : 0;
+  const rate = Number.isInteger(exact) ? exact : exact.toFixed(1); // one decimal, so it matches the overseer's figures
   const live = playhead < last; // the run is still going, so these are running totals
   const parts = [
     { name: "survived", count: survived, color: "var(--accent)" },

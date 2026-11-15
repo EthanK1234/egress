@@ -105,17 +105,19 @@
   box-shadow: none;
 }
 
+/* Three columns: the overseer, the simulation in the middle, and the floor plan with its panels. */
 .stage {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 392px;
+  grid-template-columns: minmax(260px, 300px) minmax(0, 1fr) minmax(300px, 340px);
   gap: var(--gap);
   min-height: 0;
   padding: 20px 32px 28px;
 }
 
+/* The simulation first, the numbers under it. */
 .main-col {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: var(--gap);
   min-width: 0;
   min-height: 0;
@@ -163,16 +165,61 @@
   flex: none;
 }
 
-/* Under the floor plan the column shows one thing at a time, chosen with the tabs.
-   Panels that come from elsewhere are hidden here rather than where they are rendered. */
-.side-col[data-tab="results"] .side-scroll > .overseer,
-.side-col[data-tab="people"] .side-scroll > .overseer {
-  display: none;
+/* The overseer's column scrolls on its own. As with the side column, the padding keeps
+   the cards' shadows from being cut off and the negative margin puts the cards back in place. */
+.over-col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
-/* The tab already names the panel. */
-.side-col[data-tab] .side-scroll > .overseer > h2.eyebrow {
-  display: none;
+/* The overseer is one bubble that always reaches the bottom of the page;
+   if its text is longer than that, it scrolls inside the bubble. */
+.over-col > .card {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+
+/* Mid-size windows: the overseer moves under the simulation. */
+@media (max-width: 1300px) {
+  body {
+    overflow: auto;
+  }
+
+  .app {
+    height: auto;
+    min-height: 100%;
+  }
+
+  .stage {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 370px);
+    grid-template-areas: "main side" "over side";
+  }
+
+  .main-col {
+    grid-area: main;
+    grid-template-rows: 72vh auto;
+  }
+
+  .side-col {
+    grid-area: side;
+  }
+
+  .over-col {
+    grid-area: over;
+  }
+
+  .over-col > .card {
+    overflow: visible;
+  }
+
+  .side-col > .side-scroll {
+    max-height: 70vh;
+  }
 }
 
 /* Narrow windows: stack the panels under the 3D view and let the page scroll. */
@@ -196,10 +243,15 @@
 
   .stage {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "main" "side" "over";
   }
 
   .main-col {
-    grid-template-rows: auto 64vh;
+    grid-template-rows: 64vh auto;
+  }
+
+  .side-col > .side-scroll {
+    max-height: none;
   }
 
   .side-col > .side-scroll {

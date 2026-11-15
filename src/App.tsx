@@ -23,6 +23,7 @@ import { DEFAULT_LAYERS, type Layers } from "./render/view";
 import { DEFAULT_AGENT_COUNT, DEFAULT_SEED, TICK_S } from "./sim/config";
 import { finishRecording, recordStep, startRecording, type Recorder, type Recording } from "./sim/recording";
 import { applyEdits, remapScenario } from "./sim/edits";
+import { impactJobs, type Impact } from "./editor/impact";
 import { MAPS, parseBuilding } from "./sim/maps";
 import { testMap } from "./sim/testMap";
 import type { Behavior, Building, OverseerProposal } from "./sim/types";
@@ -39,7 +40,7 @@ const SLICE_MS = 12; // time spent computing the run per animation frame, so the
 // testMap is the same plan as the first entry in MAPS, so the app has a building before any file loads.
 const DEFAULT_FLOOR: Floor = { building: testMap, fireStarts: [] };
 
-type Tab = "results" | "people" | "overseer";
+type Tab = "results" | "people";
 
 export default function App() {
   const [floors, setFloors] = useState<Floor[]>([DEFAULT_FLOOR]);
@@ -131,6 +132,33 @@ export default function App() {
   };
 
   const preview = useMemo(() => (proposal ? applyEdits(original, proposal.edits) : null), [proposal, original]);
+
+  // Each fix measured by re-running the same crowd, alone and all together. The scenario is the run
+  // the overseer looked at (the first run, once fixes have been applied). One run per frame,
+  // so the page never stalls; the results are kept for that proposal.
+  const [impactState, setImpactState] = useState<{ proposal: OverseerProposal; impact: Impact } | null>(null);
+  const impact = impactState && impactState.proposal === proposal ? impactState.impact : null;
+  const measuredScenario = (before ?? recording)?.scenario ?? null;
+  useEffect(() => {
+    if (!proposal || !preview || !measuredScenario || preview.applied.length === 0) return;
+    const edits = preview.applied.map((a) => a.edit);
+    const jobs = impactJobs(original, measuredScenario, edits);
+    const result: Impact = { baseline: null, perEdit: new Map(), all: null, done: false };
+    let i = 0;
+    let timer = 0;
+    const next = () => {
+      const job = jobs[i++];
+      const outcome = job.run();
+      if (job.key === "baseline") result.baseline = outcome;
+      else if (job.key === "all") result.all = outcome ?? (edits.length === 1 ? result.perEdit.get(edits[0]) ?? null : null);
+      else result.perEdit.set(job.key, outcome);
+      result.done = i >= jobs.length;
+      setImpactState({ proposal, impact: { ...result, perEdit: new Map(result.perEdit) } });
+      if (!result.done) timer = window.setTimeout(next, 0);
+    };
+    timer = window.setTimeout(next, 0);
+    return () => window.clearTimeout(timer);
+  }, [proposal, preview, original, measuredScenario]);
   const proposed = useMemo(
     () => (before || !preview ? undefined : preview.applied.flatMap((a) => a.cells)),
     [before, preview],
@@ -321,9 +349,8 @@ export default function App() {
   const follow = recording && picked !== null && recording.status[frame * recording.agents.length + picked] !== EVACUATED ? picked : null;
   const below = useMemo(() => floors.slice(0, level).map((f) => f.building), [floors, level]);
   const step: Step = before ? "prove" : showResults ? "diagnose" : recording || computing ? "simulate" : "setup";
-  // The side panel shows one thing at a time. The overseer's tab opens by itself once its fixes have been applied.
-  const chosenTab: Tab = tabChoice && tabChoice.run === recording ? tabChoice.tab : before ? "overseer" : "results";
-  const tab: Tab = chosenTab === "overseer" && !showResults ? "results" : chosenTab;
+  // The right-hand panel shows one thing at a time: results or people.
+  const tab: Tab = tabChoice && tabChoice.run === recording ? tabChoice.tab : "results";
 
   return (
     <div className="app">
@@ -367,14 +394,42 @@ export default function App() {
       </header>
 
       <main className="stage">
+        {/* Left: the overseer, which reads the finished run and proposes fixes. */}
+        <aside className="over-col">
+          {showResults ? (
+            <OverseerPanel
+              proposal={proposal}
+              preview={preview}
+              impact={impact}
+              busy={asking}
+              error={askError}
+              replay={replay}
+              before={before}
+              after={recording}
+              onReplay={setReplay}
+              onAsk={ask}
+              onApply={applyProposal}
+            />
+          ) : (
+            <section className="card panel overseer-intro">
+              <h2 className="eyebrow">Overseer</h2>
+              <p className="hint">
+                {before
+                  ? "Re-running the same crowd with the fixes in place. The before and after comparison appears here when the run ends."
+                  : recording
+                    ? "When the run ends, the overseer reads the results here, explains where people got stuck and proposes up to three layout fixes."
+                    : "Run a simulation first. When it ends, the overseer reads the results here and proposes layout fixes."}
+              </p>
+              <ol className="overseer-steps">
+                <li className={showResults || before ? "done" : ""}>Explains the bottleneck</li>
+                <li className={before ? "done" : ""}>Proposes up to 3 fixes</li>
+                <li>Proves them with a re-run on the same crowd</li>
+              </ol>
+            </section>
+          )}
+        </aside>
+
         <section className="main-col">
-          <Readout
-            building={building}
-            recording={recording}
-            playhead={playback.playhead}
-            agentCount={agentCount}
-            fireCount={fireStarts.length}
-          />
           <div className="player card">
             <Viewport3D
               building={building}
@@ -424,6 +479,13 @@ export default function App() {
               onSpeed={playback.setSpeed}
             />
           </div>
+          <Readout
+            building={building}
+            recording={recording}
+            playhead={playback.playhead}
+            agentCount={agentCount}
+            fireCount={fireStarts.length}
+          />
         </section>
 
         <aside className="side-col" data-tab={recording ? tab : undefined}>
@@ -459,7 +521,6 @@ export default function App() {
               options={[
                 { value: "results", label: "Results" },
                 { value: "people", label: "People" },
-                { value: "overseer", label: "Overseer", disabled: !showResults },
               ]}
               value={tab}
               onChange={(next: Tab) => {
@@ -504,20 +565,6 @@ export default function App() {
           {showResults && tab === "results" && (
             <ResultsPanel
               recording={recording}
-            />
-          )}
-          {showResults && (
-            <OverseerPanel
-              proposal={proposal}
-              preview={preview}
-              busy={asking}
-              error={askError}
-              replay={replay}
-              before={before}
-              after={recording}
-              onReplay={setReplay}
-              onAsk={ask}
-              onApply={applyProposal}
             />
           )}
           </div>
