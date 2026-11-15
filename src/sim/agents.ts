@@ -4,6 +4,7 @@ import {
   SPAWN_FIRE_CLEARANCE, TICK_S,
 } from "./config";
 import { canStep, DIRS } from "./flowfield";
+import { recordVisit } from "./metrics";
 import { shuffle, type Rng } from "./rng";
 import type { SimState } from "./sim";
 import type { Agent, Building, Scenario } from "./types";
@@ -188,6 +189,7 @@ function moveTo(s: SimState, a: Agent, nx: number, ny: number): void {
   a.x = nx;
   a.y = ny;
   const n = ny * w + nx;
+  recordVisit(s, a, n, s.tick + 1);
   if (s.building.cells[n] === EXIT) {
     a.status = "evacuated";
     const exit = s.exits.find((e) => e.cells.includes(n));

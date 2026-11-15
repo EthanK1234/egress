@@ -223,3 +223,6 @@ __marimo__/
 dist-ssr
 *.local
 .DS_Store
+
+# Node
+node_modules/

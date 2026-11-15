@@ -2,9 +2,9 @@ import { spawnAgents, updateAgent } from "./agents";
 import { EXIT, FIELD_RECOMPUTE_TICKS, MAX_TICKS, WALL } from "./config";
 import { spreadFire } from "./fire";
 import { computeField, findExits, type Exit } from "./flowfield";
-import { recordTick } from "./metrics";
+import { recordTick, recordVisit } from "./metrics";
 import { createRng, shuffle, type Rng } from "./rng";
-import type { Agent, Building, Scenario } from "./types";
+import type { Agent, Behavior, Building, Scenario } from "./types";
 
 export interface SimState {
   building: Building;
@@ -32,6 +32,9 @@ export interface SimState {
   ticksCongested: Int32Array;
   exitUsage: Record<number, number>;
   lastEvacTick: number;
+  // Paths per behavior, per cell
+  visits: Record<Behavior, Uint16Array>; // times the cell was stepped on
+  firstVisit: Record<Behavior, Float32Array>; // tick of the first step (Infinity = never)
 }
 
 export function createSim(building: Building, scenario: Scenario): SimState {
@@ -72,7 +75,14 @@ export function createSim(building: Building, scenario: Scenario): SimState {
     ticksCongested: new Int32Array(n),
     exitUsage,
     lastEvacTick: 0,
+    visits: { calm: new Uint16Array(n), panicker: new Uint16Array(n), freezer: new Uint16Array(n) },
+    firstVisit: {
+      calm: new Float32Array(n).fill(Infinity),
+      panicker: new Float32Array(n).fill(Infinity),
+      freezer: new Float32Array(n).fill(Infinity),
+    },
   };
+  for (const a of agents) recordVisit(s, a, a.y * building.width + a.x, 0);
   return s;
 }
 

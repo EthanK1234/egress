@@ -1,8 +1,16 @@
 import { BOTTLENECK_SPACING, CELL_M, CONGESTION_DENSITY, MAX_BOTTLENECKS, TICK_S, WALL } from "./config";
 import type { SimState } from "./sim";
-import type { RunMetrics } from "./types";
+import type { Agent, RunMetrics } from "./types";
 
 const BLOCK_AREA_M2 = 9 * CELL_M * CELL_M; // 3x3 cells
+
+// Called whenever an agent steps onto a cell (its spawn cell counts).
+// `tick` is the tick at which the agent is standing there.
+export function recordVisit(s: SimState, a: Agent, cell: number, tick: number): void {
+  s.visits[a.behavior][cell]++;
+  const first = s.firstVisit[a.behavior];
+  if (tick < first[cell]) first[cell] = tick;
+}
 
 // Called once per tick, after agents move.
 export function recordTick(s: SimState): void {

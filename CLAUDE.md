@@ -8,9 +8,18 @@ Fire evacuation simulator for facility managers. The user photographs a building
 4. Prove: apply edits, re-run on the same seed, show before/after numbers.
 
 ## Stack
-Vite, React, TypeScript, HTML Canvas 2D, @google/genai. Model from VITE_GEMINI_MODEL. Every Gemini call uses structured output (responseMimeType "application/json" + a JSON schema). No backend; demo runs locally only.
+Vite, React, TypeScript, HTML Canvas 2D (floor map), raw WebGL2 (3D view), @google/genai. Model from VITE_GEMINI_MODEL. Every Gemini call uses structured output (responseMimeType "application/json" + a JSON schema). No backend; demo runs locally only.
 
-No other libraries: no Tailwind, no state library, no test framework. Plain CSS.
+No other libraries: no Tailwind, no state library, no test framework, no 3D library. Plain CSS.
+
+## Playback and views
+- A run is computed up front into a Recording (src/sim/recording.ts): every agent's position and status per tick, when each cell caught fire, and which cells each behavior walked on. Computing is sliced across animation frames so the page stays responsive.
+- Playback only reads the Recording. The playhead is a fractional frame; play/pause, seek and speed never touch the sim.
+- The 3D view (main) and the 2D floor map (side) both draw from (recording, playhead, layers), so they always agree. Fire starts are placed on the 2D map.
+- Layers: show/hide people per behavior, path highlights per behavior, grid, names, bottleneck rings.
+- Results appear once playback reaches the end of the run.
+- The 3D view draws only when something changed. Flames and paths are uploaded once per run and animated in the shaders from the playhead; walls are one static mesh; people and flames are instanced.
+- Font: Kazesawa, self-hosted Latin subset in public/fonts/.
 
 ## Sim rules
 - Grid cell = 0.5 m, tick = 0.5 s. Cells: 0 EMPTY, 1 WALL, 2 DOOR, 3 EXIT.
@@ -21,6 +30,7 @@ No other libraries: no Tailwind, no state library, no test framework. Plain CSS.
 - 4 hardcoded agent types in config.ts (e.g. employee, visitor, elderly, child) with speed and familiarity.
 - Trapped: fire reaches the agent or no path to any exit.
 - All randomness goes through a seeded RNG (src/sim/rng.ts) so before/after runs are comparable.
+- The sim counts, per behavior and per cell, how often the cell was stepped on and when it was first stepped on (visits, firstVisit). These feed the path highlights and do not affect the sim.
 - All tunable constants live in src/sim/config.ts.
 
 ## Types (src/sim/types.ts)
@@ -35,13 +45,16 @@ interface OverseerProposal { diagnosis: string; edits: BuildingEdit[]; expectedI
 ```
 
 ## Folders
-- src/sim/: pure TypeScript, no React or DOM imports (types, config, rng, fire, flowfield, agents, sim, metrics, edits, testMap)
+- src/sim/: pure TypeScript, no React or DOM imports (types, config, rng, fire, flowfield, agents, sim, metrics, recording, edits, testMap)
+- src/render/: drawing code shared by both views, no React (palette, view, paths, mat4, camera, meshes, shaders, renderer)
 - src/ai/: Gemini calls (gemini.ts client, floorplan.ts, overseer.ts)
-- src/components/: React UI (MapCanvas, Toolbar, panels)
+- src/components/: React UI (Viewport3D, MapCanvas, Transport, Readout, LayerPanel, ScenarioPanel, ResultsPanel, Switch, usePlayback)
+- public/fonts/: Kazesawa font files and licence
 - public/venue.json: backup venue map
 - public/cache/: saved Gemini responses for offline demo
 
 ## Coding rules
 - Keep it simple. Small files, plain functions, no premature abstraction.
+- Colors drawn on the map, in the 3D view or on legend swatches come from src/render/palette.ts. The UI itself stays neutral gray: color is for data.
 - Never hardcode the API key. Read it from import.meta.env.VITE_GEMINI_API_KEY.
 - Env: copy .env.example to .env and fill in values. .env is gitignored.

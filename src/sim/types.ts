@@ -21,6 +21,8 @@ export interface Agent {
   frozenTicks: number;
 }
 
+export type Behavior = Agent["behavior"];
+
 export interface Scenario {
   seed: number;
   agentCount: number;
