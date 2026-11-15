@@ -14,6 +14,7 @@ interface Props {
   playhead: number;
   layers: Layers;
   rings: { x: number; y: number }[];
+  proposed?: number[]; // cell indices the overseer's edits would change, drawn in green
   onCellClick?: (x: number, y: number) => void; // set while fire starts can be edited
 }
 
@@ -36,7 +37,7 @@ function fireChannel(age: number, channel: number): number {
 }
 
 // The top-down map. Draws the same recording as the 3D view, at the same playhead.
-export default function MapCanvas({ building, recording, fireStarts, playhead, layers, rings, onCellClick }: Props) {
+export default function MapCanvas({ building, recording, fireStarts, playhead, layers, rings, proposed, onCellClick }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cellLayer = useRef<{ canvas: HTMLCanvasElement; image: ImageData } | null>(null);
@@ -161,8 +162,18 @@ export default function MapCanvas({ building, recording, fireStarts, playhead, l
       }
     }
 
-    // 4. Markers: fire starts while editing, bottlenecks once the run is done.
+    // 4. Markers: proposed edits, fire starts while editing, bottlenecks once the run is done.
     ctx.lineWidth = 1.5;
+    if (proposed?.length) {
+      ctx.fillStyle = COLOR.exit;
+      ctx.strokeStyle = "#ffffff";
+      for (const i of proposed) {
+        const px = (i % w) * cell;
+        const py = Math.floor(i / w) * cell;
+        ctx.fillRect(px, py, cell, cell);
+        ctx.strokeRect(px + 0.5, py + 0.5, cell - 1, cell - 1);
+      }
+    }
     if (!rec) {
       ctx.strokeStyle = COLOR.fireTip;
       for (const [x, y] of fireStarts) {
@@ -237,7 +248,7 @@ export default function MapCanvas({ building, recording, fireStarts, playhead, l
       ctx.lineWidth = 1;
       ctx.strokeRect(Math.round(hover[0] * cell) + 0.5, Math.round(hover[1] * cell) + 0.5, Math.round(cell), Math.round(cell));
     }
-  }, [building, recording, fireStarts, playhead, layers, rings, exits, width, hover, fontReady, onCellClick]);
+  }, [building, recording, fireStarts, playhead, layers, rings, proposed, exits, width, hover, fontReady, onCellClick]);
 
   const cellAt = (e: MouseEvent<HTMLCanvasElement>): [number, number] | null => {
     const rect = e.currentTarget.getBoundingClientRect();

@@ -913,3 +913,55 @@ input[type="number"]:disabled {
     animation: none;
   }
 }
+
+/* Overseer */
+
+.overseer .diagnosis {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.overseer .error {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+
+.edits {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.edit {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  font-size: 13.5px;
+}
+
+.edit .dot {
+  margin-top: 6px;
+}
+
+.edit strong {
+  display: block;
+  font-weight: 600;
+}
+
+.edit .reason,
+.edit .why {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-3);
+}
+
+.edit.rejected strong {
+  color: var(--text-3);
+  text-decoration: line-through;
+}

@@ -1,6 +1,8 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { getOverseerProposal } from "./ai/overseer";
 import LayerPanel from "./components/LayerPanel";
 import MapCanvas from "./components/MapCanvas";
+import OverseerPanel from "./components/OverseerPanel";
 import Readout from "./components/Readout";
 import ResultsPanel from "./components/ResultsPanel";
 import ScenarioPanel from "./components/ScenarioPanel";
@@ -11,10 +13,11 @@ import Viewport3D from "./components/Viewport3D";
 import { DEFAULT_LAYERS, type Layers } from "./render/view";
 import { DEFAULT_AGENT_COUNT, DEFAULT_SEED, TICK_S, WALL } from "./sim/config";
 import { finishRecording, recordStep, startRecording, type Recorder, type Recording } from "./sim/recording";
+import { applyEdits, remapScenario } from "./sim/edits";
 import { testMap } from "./sim/testMap";
-import type { Behavior } from "./sim/types";
+import type { Behavior, Building, OverseerProposal, RunMetrics } from "./sim/types";
 
-const building = testMap;
+const originalBuilding = testMap;
 const NO_RINGS: { x: number; y: number }[] = [];
 const SLICE_MS = 12; // time spent computing the run per animation frame, so the page stays responsive
 
@@ -26,6 +29,13 @@ export default function App() {
   const [recording, setRecording] = useState<Recording | null>(null);
   const [computing, setComputing] = useState(false);
   const [simulatedSec, setSimulatedSec] = useState(0);
+  const [building, setBuilding] = useState<Building>(originalBuilding); // the original, or the overseer's fixed version
+  const [proposal, setProposal] = useState<OverseerProposal | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [askError, setAskError] = useState<string | null>(null);
+  const [replay, setReplay] = useState(false);
+  const [before, setBefore] = useState<RunMetrics | null>(null); // metrics of the run the edits were applied to
+  const askId = useRef(0);
   const recorder = useRef<Recorder | null>(null);
   const playback = usePlayback(recording?.frames ?? 0);
 
@@ -63,10 +73,49 @@ export default function App() {
   };
 
   const reset = () => {
+    askId.current++;
+    setBuilding(originalBuilding);
+    setProposal(null);
+    setAsking(false);
+    setAskError(null);
+    setBefore(null);
     recorder.current = null;
     setComputing(false);
     setRecording(null);
     playback.reset();
+  };
+
+  const preview = useMemo(() => (proposal ? applyEdits(originalBuilding, proposal.edits) : null), [proposal]);
+  const proposed = useMemo(
+    () => (before || !preview ? undefined : preview.applied.flatMap((a) => a.cells)),
+    [before, preview],
+  );
+
+  const ask = async () => {
+    if (!recording) return;
+    const id = ++askId.current;
+    setAsking(true);
+    setAskError(null);
+    try {
+      const result = await getOverseerProposal(recording.building, recording.scenario, recording.metrics, { replay });
+      if (id === askId.current) setProposal(result);
+    } catch (err) {
+      if (id === askId.current) setAskError(err instanceof Error ? err.message : String(err));
+    } finally {
+      if (id === askId.current) setAsking(false);
+    }
+  };
+
+  // Applies the proposal to the original building and re-runs the same scenario (same seed).
+  const applyProposal = () => {
+    if (!recording || !preview || preview.applied.length === 0) return;
+    setBefore(recording.metrics);
+    setBuilding(preview.building);
+    recorder.current = startRecording(preview.building, remapScenario(recording.scenario, preview.exitIdMap));
+    setRecording(null);
+    playback.reset();
+    setSimulatedSec(0);
+    setComputing(true);
   };
 
   const toggleFire = (x: number, y: number) => {
@@ -198,6 +247,7 @@ export default function App() {
               playhead={playback.playhead}
               layers={layers}
               rings={rings}
+              proposed={proposed}
               onCellClick={recording || computing ? undefined : toggleFire}
             />
             <LayerPanel layers={layers} onChange={setLayers} counts={counts} />
@@ -227,6 +277,20 @@ export default function App() {
               recording={recording}
               showBottlenecks={layers.bottlenecks}
               onShowBottlenecks={(on) => setLayers({ ...layers, bottlenecks: on })}
+            />
+          )}
+          {showResults && (
+            <OverseerPanel
+              proposal={proposal}
+              preview={preview}
+              busy={asking}
+              error={askError}
+              replay={replay}
+              before={before}
+              after={recording.metrics}
+              onReplay={setReplay}
+              onAsk={ask}
+              onApply={applyProposal}
             />
           )}
         </aside>
