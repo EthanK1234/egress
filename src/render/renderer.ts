@@ -11,12 +11,12 @@
 import { DOOR, EXIT } from "../sim/config";
 import { EVACUATED, FROZEN, TRAPPED, type Recording } from "../sim/recording";
 import type { Behavior, Building } from "../sim/types";
-import { viewProjection, type Camera } from "./camera";
+import { viewBasis, viewProjection, type Camera } from "./camera";
 import { translated, type Mat4 } from "./mat4";
 import { FLOOR_SPACING, cursorPlate, flameMesh, groundMargin, groundQuads, pawnMesh, pushFurniture, pushWalls, topAt } from "./meshes";
 import { BEHAVIORS, BEHAVIOR_COLOR, COLOR, rgb, rgb255, type RGB } from "./palette";
 import { PATH_ALPHA, pathLayers } from "./paths";
-import { AGENT_VS, FLAME_VS, FLAT_FS, FLOOR_FS, FLOOR_VS, WALL_VS } from "./shaders";
+import { AGENT_VS, FLAME_VS, FLAT_FS, FLOOR_FS, FLOOR_VS, SKY_FS, SKY_VS, WALL_VS } from "./shaders";
 import { RING_RADIUS, type Layers } from "./view";
 
 export interface Frame3D {
@@ -60,11 +60,22 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
   if (!context) return null;
   const gl = context;
 
+  const skyProg = link(gl, SKY_VS, SKY_FS);
   const floorProg = link(gl, FLOOR_VS, FLOOR_FS);
   const wallProg = link(gl, WALL_VS, FLAT_FS);
   const agentProg = link(gl, AGENT_VS, FLAT_FS);
   const flameProg = link(gl, FLAME_VS, FLAT_FS);
   const uniform = (p: WebGLProgram, name: string) => gl.getUniformLocation(p, name);
+  const skyU = {
+    forward: uniform(skyProg, "uForward"),
+    right: uniform(skyProg, "uRight"),
+    up: uniform(skyProg, "uUp"),
+    tan: uniform(skyProg, "uTan"),
+  };
+  gl.useProgram(skyProg);
+  gl.uniform3fv(uniform(skyProg, "uHorizon"), rgb(COLOR.background));
+  gl.uniform3fv(uniform(skyProg, "uZenith"), rgb(COLOR.sky));
+  const skyVao = gl.createVertexArray(); // no attributes: the shader makes the triangle from the vertex number
   const floorU = {
     viewProj: uniform(floorProg, "uViewProj"),
     size: uniform(floorProg, "uSize"),
@@ -317,7 +328,21 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
   function draw(f: Frame3D): Mat4 {
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    const viewProj = viewProjection(f.camera, canvas.width / Math.max(canvas.height, 1));
+    const aspect = canvas.width / Math.max(canvas.height, 1);
+    const viewProj = viewProjection(f.camera, aspect);
+
+    // The sky goes behind everything, so it is drawn first and leaves the depth buffer alone.
+    const basis = viewBasis(f.camera, aspect);
+    gl.disable(gl.DEPTH_TEST);
+    gl.useProgram(skyProg);
+    gl.uniform3fv(skyU.forward, basis.forward);
+    gl.uniform3fv(skyU.right, basis.right);
+    gl.uniform3fv(skyU.up, basis.up);
+    gl.uniform2f(skyU.tan, basis.tanX, basis.tanY);
+    gl.bindVertexArray(skyVao);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.enable(gl.DEPTH_TEST);
+
     // Everything on the shown floor is drawn `elevation` above the ground.
     const lifted = elevation > 0 ? translated(viewProj, 0, elevation, 0) : viewProj;
     if (!building) return lifted;
@@ -379,9 +404,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
   }
 
   function dispose(): void {
-    for (const p of [floorProg, wallProg, agentProg, flameProg]) gl.deleteProgram(p);
+    for (const p of [skyProg, floorProg, wallProg, agentProg, flameProg]) gl.deleteProgram(p);
     for (const b of [groundBuf, wallBuf, lowerBuf, cursorBuf, pawnBuf, flameBuf, agentInstBuf, flameInstBuf]) gl.deleteBuffer(b);
-    for (const v of [floorVao, wallVao, lowerVao, cursorVao, agentVao, flameVao]) gl.deleteVertexArray(v);
+    for (const v of [skyVao, floorVao, wallVao, lowerVao, cursorVao, agentVao, flameVao]) gl.deleteVertexArray(v);
     for (const t of [baseTex, stateTex, trafficTex]) gl.deleteTexture(t);
   }
 

@@ -104,6 +104,34 @@ void main() {
   gl_Position = uViewProj * vec4(center.x + p.x, p.y, center.y + p.z, 1.0);
 }`;
 
+// The sky: one triangle that covers the screen, drawn first. Each pixel's color depends only on how
+// far above the horizon it looks. At and below the horizon it is the background color, which is
+// also what the ground fades to, so the two meet without an edge.
+export const SKY_VS = `#version 300 es
+out vec2 vNdc;
+void main() {
+  vNdc = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2)) * 2.0 - 1.0;
+  gl_Position = vec4(vNdc, 0.0, 1.0);
+}`;
+
+export const SKY_FS = `#version 300 es
+precision highp float;
+in vec2 vNdc;
+uniform vec3 uForward;
+uniform vec3 uRight;
+uniform vec3 uUp;
+uniform vec2 uTan;
+uniform vec3 uHorizon;
+uniform vec3 uZenith;
+out vec4 outColor;
+void main() {
+  vec3 dir = normalize(uForward + uRight * (vNdc.x * uTan.x) + uUp * (vNdc.y * uTan.y));
+  vec3 color = mix(uHorizon, uZenith, smoothstep(0.0, 0.6, dir.y));
+  // A little noise, so the slow dark gradient doesn't show bands.
+  float noise = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
+  outColor = vec4(color + noise / 255.0, 1.0);
+}`;
+
 export const FLOOR_VS = `#version 300 es
 layout(location = 0) in vec2 aPos;
 uniform mat4 uViewProj;

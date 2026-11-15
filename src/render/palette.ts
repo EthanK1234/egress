@@ -30,6 +30,7 @@ export const COLOR = {
   furnitureTop: "#9a846b", // 3D view: tables and chairs
   furnitureSide: "#5f5040",
   storey: "#2b333f", // walls of the floors under the one being shown
+  sky: "#1d2836", // overhead; the sky fades down to `background` at the horizon, where the ground ends
   slab: "#0f141a", // ground level inside the building, when the floor shown is above it
   exit: "#12a150",
   fire: "#d03b3b",

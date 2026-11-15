@@ -42,6 +42,16 @@ export function viewProjection(c: Camera, aspect: number): Mat4 {
   return multiply(perspective(FOV, aspect, Math.max(c.dist * 0.05, 0.5), c.dist + c.reach * 3), view);
 }
 
+// The directions a view looks along, for working out which way each pixel points (the sky).
+// tanX and tanY are the half-widths of the view at distance 1.
+export function viewBasis(c: Camera, aspect: number): { forward: Vec3; right: Vec3; up: Vec3; tanX: number; tanY: number } {
+  const eye = orbitEye(c);
+  const forward = normalize(c.fp ? [c.fp.dx, -FP_TILT, c.fp.dz] : [c.tx - eye[0], c.ty - eye[1], c.tz - eye[2]]);
+  const right = normalize(cross(forward, [0, 1, 0]));
+  const tan = Math.tan((c.fp ? FP_FOV : FOV) / 2);
+  return { forward, right, up: cross(right, forward), tanX: tan * aspect, tanY: tan };
+}
+
 // The overview: the whole floor, centred, seen from above and a little to one side.
 // `elevation` is the height of the floor being shown.
 export function fitCamera(b: Building, aspect: number, elevation: number): Camera {
